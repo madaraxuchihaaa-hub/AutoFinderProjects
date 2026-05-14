@@ -32,7 +32,6 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-autofinder}
       PORT: "3000"
       JWT_SECRET: ${JWT_SECRET:-docker-dev-only-change-me-min-32-characters-long}
-      SESSION_SECRET: ${SESSION_SECRET:-docker-dev-only-change-me-min-32-characters-long}
     depends_on:
       db:
         condition: service_healthy

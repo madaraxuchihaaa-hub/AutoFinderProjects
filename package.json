@@ -10,7 +10,6 @@
     "postinstall": "npm ci --prefix server",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",
-    "web:dev": "npm run dev --prefix web",
     "lint": "expo lint",
     "build:web": "expo export --platform web",
     "android:prebuild": "expo prebuild --platform android",

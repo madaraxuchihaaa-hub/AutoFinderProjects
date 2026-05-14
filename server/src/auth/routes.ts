@@ -3,8 +3,11 @@ import type { Express } from "express";
 import type { Pool } from "pg";
 import { signAccessToken } from "./jwt.js";
 import { requireAuth } from "./middleware.js";
-import { findUserByEmail, normalizeEmail, toSafeUser, verifyPassword } from "./loginCore.js";
 import type { UserRole, UserRow } from "./types.js";
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
 
 export function registerAuthRoutes(app: Express, pool: Pool): void {
   app.post("/api/auth/register", async (req, res) => {
@@ -26,6 +29,16 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
         error: "validation",
         message: "Пароль не короче 8 символов.",
       });
+      return;
+    }
+
+    const reserved = [
+      "moderator@autofinder.local",
+      "admin@autofinder.local",
+      "demo@autofinder.local",
+    ];
+    if (reserved.includes(email)) {
+      res.status(400).json({ error: "validation", message: "Этот email зарезервирован." });
       return;
     }
 
@@ -54,8 +67,7 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
     }
   });
 
-  /** JWT только для мобильного клиента (Expo). */
-  app.post("/api/mobile/login", async (req, res) => {
+  app.post("/api/auth/login", async (req, res) => {
     const email = normalizeEmail(String(req.body?.email ?? ""));
     const password = String(req.body?.password ?? "");
     if (!email || !password) {
@@ -63,12 +75,18 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
       return;
     }
 
-    const row = await findUserByEmail(pool, email);
+    const { rows } = await pool.query<
+      UserRow & { password_hash: string }
+    >(
+      `SELECT id, email, password_hash, full_name, phone, role, created_at FROM users WHERE email = $1`,
+      [email]
+    );
+    const row = rows[0];
     if (!row) {
       res.status(401).json({ error: "credentials", message: "Неверный email или пароль." });
       return;
     }
-    const ok = await verifyPassword(row, password);
+    const ok = await bcrypt.compare(password, row.password_hash);
     if (!ok) {
       res.status(401).json({ error: "credentials", message: "Неверный email или пароль." });
       return;
@@ -77,8 +95,14 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
     const role = row.role as UserRole;
     const token = signAccessToken(row.id, row.email, role);
     res.json({
-      token,
-      user: toSafeUser(row),
+      accessToken: token,
+      user: {
+        id: row.id,
+        email: row.email,
+        full_name: row.full_name,
+        phone: row.phone,
+        role,
+      },
     });
   });
 

@@ -71,9 +71,3 @@ export type LoginResponse = {
   accessToken: string;
   user: AuthUser;
 };
-
-/** Ответ POST /api/mobile/login (JWT). */
-export type MobileLoginResponse = {
-  token: string;
-  user: AuthUser;
-};
