@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../auth/AuthContext";
 import { apiPatch } from "../api/client";
@@ -26,6 +27,7 @@ function roleLabel(role: UserRole): string {
 
 export default function ProfileScreen() {
   const { user, refreshUser, logout, setProfileLocal } = useAuth();
+  const tabBarHeight = useBottomTabBarHeight();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
@@ -82,7 +84,7 @@ export default function ProfileScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[styles.scroll, { paddingBottom: tabBarHeight + spacing.lg }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -127,12 +129,12 @@ export default function ProfileScreen() {
             {saving ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={styles.ctaText}>Сохранить профиль</Text>
+              <Text style={styles.ctaText}>Сохранить</Text>
             )}
           </LinearGradient>
         </Pressable>
         <Pressable onPress={confirmLogout} style={styles.outlineBtn}>
-          <Text style={styles.outlineText}>Выйти из аккаунта</Text>
+          <Text style={styles.outlineText}>Выйти</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -142,7 +144,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   centered: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
-  scroll: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
+  scroll: { padding: spacing.lg },
   card: {
     backgroundColor: colors.bgElevated,
     borderRadius: radii.lg,

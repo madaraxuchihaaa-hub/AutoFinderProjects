@@ -75,7 +75,7 @@ export default function CreateListingScreen({ navigation }: Props) {
         body_type: body.trim() || undefined,
         image_urls,
       });
-      Alert.alert("Готово", "Объявление опубликовано и поставлено в очередь автопостинга.", [
+      Alert.alert("Готово", "Объявление опубликовано.", [
         {
           text: "OK",
           onPress: () => {
@@ -104,8 +104,7 @@ export default function CreateListingScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.hint}>
-          Объявление привязывается к вашему аккаунту. Фото — прямые HTTPS-ссылки (по одной в
-          строке или через запятую).
+          Фото — ссылки HTTPS, по строке или через запятую.
         </Text>
         <Field label="Заголовок" value={title} onChangeText={setTitle} ph="Напр. BMW 320i, один владелец" />
         <Row>

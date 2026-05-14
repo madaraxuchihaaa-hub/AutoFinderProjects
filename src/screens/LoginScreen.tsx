@@ -48,7 +48,7 @@ export default function LoginScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>AutoFinder</Text>
-        <Text style={styles.sub}>Войдите, чтобы управлять гаражом и очередью публикаций.</Text>
+        <Text style={styles.sub}>Вход в аккаунт</Text>
         {err ? <Text style={styles.err}>{err}</Text> : null}
         <View style={styles.field}>
           <Text style={styles.label}>Email</Text>

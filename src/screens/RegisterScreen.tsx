@@ -58,10 +58,6 @@ export default function RegisterScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.hint}>
-          Новый аккаунт получает роль «Пользователь». Модератор и администратор задаются на
-          сервере.
-        </Text>
         {err ? <Text style={styles.err}>{err}</Text> : null}
         <View style={styles.field}>
           <Text style={styles.label}>Email</Text>
@@ -133,13 +129,6 @@ export default function RegisterScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
-  hint: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.textMuted,
-    marginBottom: spacing.lg,
-  },
   err: {
     fontFamily: fonts.medium,
     fontSize: 14,

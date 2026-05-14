@@ -18,7 +18,11 @@
       "bundleIdentifier": "com.autofinder.app"
     },
     "android": {
-      "package": "com.autofinder.app"
+      "package": "com.autofinder.app",
+      "softwareKeyboardLayoutMode": "resize",
+      "navigationBar": {
+        "backgroundColor": "#0E141C"
+      }
     },
     "web": {
       "bundler": "metro",

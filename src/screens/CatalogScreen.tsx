@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { CommonActions, useFocusEffect } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { apiGet } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
@@ -23,6 +25,7 @@ export default function CatalogScreen({ navigation }: Props) {
   const [items, setItems] = useState<ListingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const load = useCallback(async () => {
     const data = await apiGet<ListingRow[]>("/api/listings?limit=50");
@@ -66,16 +69,21 @@ export default function CatalogScreen({ navigation }: Props) {
     <FlatList
       data={items}
       keyExtractor={(it) => it.id}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[
+        styles.list,
+        { paddingBottom: tabBarHeight + spacing.lg },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
           tintColor={colors.accent}
+          colors={Platform.OS === "android" ? [colors.accent] : undefined}
+          progressBackgroundColor={colors.bgElevated}
         />
       }
       ListEmptyComponent={
-        <Text style={styles.empty}>Нет опубликованных объявлений</Text>
+        <Text style={styles.empty}>Пока нет объявлений</Text>
       }
       renderItem={({ item }) => {
         const uri = item.images?.[0];
@@ -125,7 +133,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  list: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2 },
+  list: { padding: spacing.lg, gap: spacing.md },
   empty: {
     textAlign: "center",
     marginTop: spacing.xl,

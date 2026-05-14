@@ -1,5 +1,7 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { CommonActions } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import {
   ImageBackground,
   Pressable,
@@ -43,6 +45,8 @@ function goModal(navigation: Props["navigation"], name: "Platforms" | "CreateLis
 
 export default function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
+  const scrollBottom = tabBarHeight + spacing.md;
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [featured, setFeatured] = useState<AggregatedRow[]>([]);
   const [err, setErr] = useState<string | null>(null);
@@ -69,12 +73,16 @@ export default function HomeScreen({ navigation }: Props) {
     };
   }, []);
 
+  const errHint = isStandaloneAppWithoutApiEnv()
+    ? "В .env задайте EXPO_PUBLIC_API_URL и пересоберите APK."
+    : hasRemoteApiUrl()
+      ? "Проверьте, что API отвечает по адресу из .env (/health)."
+      : "В .env укажите EXPO_PUBLIC_API_URL (Railway или IP ПК в Wi‑Fi).";
+
   return (
     <ScrollView
       style={styles.root}
-      contentContainerStyle={{
-        paddingBottom: spacing.xl + insets.bottom,
-      }}
+      contentContainerStyle={{ paddingBottom: scrollBottom }}
       showsVerticalScrollIndicator={false}
     >
       <LinearGradient
@@ -83,66 +91,52 @@ export default function HomeScreen({ navigation }: Props) {
         end={{ x: 1, y: 1 }}
         style={[styles.hero, { paddingTop: insets.top + spacing.lg }]}
       >
-        <Text style={styles.badge}>React Native · Node · PostgreSQL</Text>
         <Text style={styles.title}>AutoFinder</Text>
-        <Text style={styles.subtitle}>
-          Агрегация объявлений и очередь автоматического размещения на
-          площадках из одного окна.
-        </Text>
+        <Text style={styles.subtitle}>Подбор и публикация объявлений</Text>
         {err ? (
           <View style={styles.warnBox}>
-            <Text style={styles.warnTitle}>API недоступен</Text>
-            <Text style={styles.warnText}>{err}</Text>
-            <Text style={styles.warnHint}>
-              {isStandaloneAppWithoutApiEnv()
-                ? "В корне проекта создайте файл .env с строкой EXPO_PUBLIC_API_URL=https://autofinderprojects-production.up.railway.app (без слэша в конце), затем заново соберите APK (npm run android:apk:debug)."
-                : hasRemoteApiUrl()
-                  ? "Проверьте, что API на Railway запущен и открывается в браузере по этому же адресу (/health)."
-                  : "Для Expo на телефоне: в .env укажите EXPO_PUBLIC_API_URL на Railway или запустите API на ПК (npm run server) в той же Wi‑Fi сети. Для эмулятора достаточно локального сервера."}
+            <Text style={styles.warnTitle}>Нет связи с API</Text>
+            <Text style={styles.warnText} numberOfLines={2}>
+              {err}
             </Text>
+            <Text style={styles.warnHint}>{errHint}</Text>
           </View>
         ) : null}
         <View style={styles.statsRow}>
-          <StatBox
-            label="Витрина агрегатора"
-            value={stats?.aggregated ?? "—"}
-          />
-          <StatBox
-            label="Опубликовано"
-            value={stats?.publishedListings ?? "—"}
-          />
+          <StatBox label="Витрина" value={stats?.aggregated ?? "—"} />
+          <StatBox label="Онлайн" value={stats?.publishedListings ?? "—"} />
           <StatBox label="В очереди" value={stats?.queuePending ?? "—"} />
         </View>
       </LinearGradient>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Быстрые действия</Text>
-        <View style={styles.tiles}>
-          <Tile
+        <Text style={styles.sectionTitle}>Действия</Text>
+        <View style={styles.actions}>
+          <ActionRow
+            icon="globe-outline"
             title="Рынок"
-            caption="Вкладка «Рынок»"
             onPress={() => navigation.navigate("Market")}
           />
-          <Tile
+          <ActionRow
+            icon="car-sport"
             title="Гараж"
-            caption="Ваши объявления"
             onPress={() => navigation.navigate("Garage")}
           />
-          <Tile
+          <ActionRow
+            icon="add-circle-outline"
             title="Новое объявление"
-            caption="Создать и в очередь"
             onPress={() => goModal(navigation, "CreateListing")}
           />
-          <Tile
+          <ActionRow
+            icon="share-social-outline"
             title="Площадки"
-            caption="Куда публикуем"
             onPress={() => goModal(navigation, "Platforms")}
           />
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Сейчас в агрегаторе</Text>
+        <Text style={styles.sectionTitle}>Свежие</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -153,9 +147,7 @@ export default function HomeScreen({ navigation }: Props) {
             return (
               <Pressable
                 key={item.id}
-                onPress={() =>
-                  goVehicle(navigation, "aggregated", item.id)
-                }
+                onPress={() => goVehicle(navigation, "aggregated", item.id)}
                 style={styles.miniCard}
               >
                 {uri ? (
@@ -198,26 +190,25 @@ function StatBox({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function Tile({
+function ActionRow({
+  icon,
   title,
-  caption,
   onPress,
 }: {
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
-  caption: string;
   onPress: () => void;
 }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tile, pressed && { opacity: 0.9 }]}>
-      <LinearGradient
-        colors={[colors.surface, colors.bgElevated]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.tileInner}
-      >
-        <Text style={styles.tileTitle}>{title}</Text>
-        <Text style={styles.tileCap}>{caption}</Text>
-      </LinearGradient>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.actionRow, pressed && { opacity: 0.88 }]}
+    >
+      <View style={styles.actionIconWrap}>
+        <Ionicons name={icon} size={22} color={colors.accent} />
+      </View>
+      <Text style={styles.actionTitle}>{title}</Text>
+      <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
     </Pressable>
   );
 }
@@ -230,52 +221,39 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: radii.xl,
     borderBottomRightRadius: radii.xl,
   },
-  badge: {
-    alignSelf: "flex-start",
-    fontFamily: fonts.medium,
-    fontSize: 11,
-    letterSpacing: 0.6,
-    color: colors.accent,
-    backgroundColor: colors.accentDim,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.sm,
-    textTransform: "uppercase",
-    marginBottom: spacing.md,
-  },
   title: {
     fontFamily: fonts.bold,
-    fontSize: 36,
+    fontSize: 34,
     color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
-    marginTop: spacing.sm,
-    fontFamily: fonts.regular,
-    fontSize: 15,
-    lineHeight: 22,
+    marginTop: spacing.xs,
+    fontFamily: fonts.medium,
+    fontSize: 14,
     color: colors.textMuted,
-    maxWidth: 360,
   },
   warnBox: {
     marginTop: spacing.md,
     padding: spacing.md,
     borderRadius: radii.md,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     backgroundColor: "rgba(255,107,107,0.08)",
   },
   warnTitle: {
     fontFamily: fonts.semibold,
+    fontSize: 14,
     color: colors.danger,
     marginBottom: 4,
   },
-  warnText: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 13 },
+  warnText: { fontFamily: fonts.regular, color: colors.textMuted, fontSize: 12 },
   warnHint: {
     marginTop: spacing.sm,
-    fontFamily: fonts.medium,
-    color: colors.text,
+    fontFamily: fonts.regular,
+    color: colors.textMuted,
     fontSize: 12,
+    lineHeight: 17,
   },
   statsRow: {
     flexDirection: "row",
@@ -288,12 +266,12 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.sm,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
   statValue: {
     fontFamily: fonts.bold,
-    fontSize: 20,
+    fontSize: 19,
     color: colors.accent,
   },
   statLabel: {
@@ -304,32 +282,40 @@ const styles = StyleSheet.create({
   },
   section: {
     paddingHorizontal: spacing.lg,
-    marginTop: spacing.xl,
+    marginTop: spacing.lg,
   },
   sectionTitle: {
     fontFamily: fonts.semibold,
-    fontSize: 18,
+    fontSize: 16,
     color: colors.text,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    letterSpacing: 0.2,
   },
-  tiles: { gap: spacing.sm },
-  tile: {
-    borderRadius: radii.lg,
-    overflow: "hidden",
-    borderWidth: 1,
+  actions: { gap: spacing.sm },
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.bgElevated,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
   },
-  tileInner: { padding: spacing.lg },
-  tileTitle: {
+  actionIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    backgroundColor: colors.accentDim,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.md,
+  },
+  actionTitle: {
+    flex: 1,
     fontFamily: fonts.semibold,
-    fontSize: 17,
+    fontSize: 16,
     color: colors.text,
-  },
-  tileCap: {
-    marginTop: 4,
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textMuted,
   },
   hScroll: { gap: spacing.sm, paddingRight: spacing.lg },
   miniCard: {

@@ -117,7 +117,7 @@ export default function VehicleDetailScreen({ route }: Props) {
             ]}
           />
         ) : null}
-        <Text style={styles.badge}>Агрегированное объявление</Text>
+        <Text style={styles.badge}>Рынок</Text>
         <Text style={styles.title}>{agg.title}</Text>
         <Text style={styles.price}>{formatRub(agg.price_rub)}</Text>
         <View style={styles.grid}>
@@ -125,7 +125,7 @@ export default function VehicleDetailScreen({ route }: Props) {
           <Spec k="Год" v={agg.year != null ? String(agg.year) : "—"} />
           <Spec k="Пробег" v={formatKm(agg.mileage_km)} />
           <Spec k="Город" v={agg.city ?? "—"} />
-          <Spec k="Внешний ID" v={agg.external_id} />
+          <Spec k="ID" v={agg.external_id} />
         </View>
       </ScrollView>
     );
@@ -158,7 +158,9 @@ export default function VehicleDetailScreen({ route }: Props) {
             ]}
           />
         ) : null}
-        <Text style={styles.badge}>Ваше объявление · {listing.status}</Text>
+        <Text style={styles.badge}>
+          Гараж · {listing.status}
+        </Text>
         <Text style={styles.title}>{listing.title}</Text>
         <Text style={styles.price}>{formatRub(listing.price_rub)}</Text>
         {listing.description ? (

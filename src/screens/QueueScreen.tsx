@@ -2,12 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { apiGet } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
 import type { QueueJobRow } from "../types/api";
@@ -19,15 +21,16 @@ type Props = BottomTabScreenProps<MainTabParamList, "Automation">;
 const statusLabel: Record<string, string> = {
   pending: "В очереди",
   processing: "В работе",
-  published: "Размещено",
+  published: "Готово",
   failed: "Ошибка",
-  cancelled: "Отменено",
+  cancelled: "Отмена",
 };
 
 export default function QueueScreen(_props: Props) {
   const [rows, setRows] = useState<QueueJobRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const load = useCallback(async () => {
     const data = await apiGet<QueueJobRow[]>("/api/queue/jobs");
@@ -69,22 +72,21 @@ export default function QueueScreen(_props: Props) {
     <FlatList
       data={rows}
       keyExtractor={(item) => item.id}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[
+        styles.list,
+        { paddingBottom: tabBarHeight + spacing.lg },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
           tintColor={colors.accent}
+          colors={Platform.OS === "android" ? [colors.accent] : undefined}
+          progressBackgroundColor={colors.bgElevated}
         />
       }
-      ListHeaderComponent={
-        <Text style={styles.intro}>
-          Задачи автоматического выкладывания на площадки. После создания объявления
-          в гараже сюда попадают записи для Авито, Дром и др.
-        </Text>
-      }
       ListEmptyComponent={
-        <Text style={styles.empty}>Очередь пуста — создайте объявление в гараже.</Text>
+        <Text style={styles.empty}>Очередь пуста</Text>
       }
       renderItem={({ item }) => (
         <View style={styles.card}>
@@ -105,7 +107,9 @@ export default function QueueScreen(_props: Props) {
           </Text>
           <Text style={styles.price}>{formatRub(item.price_rub)}</Text>
           {item.last_error ? (
-            <Text style={styles.err}>{item.last_error}</Text>
+            <Text style={styles.err} numberOfLines={3}>
+              {item.last_error}
+            </Text>
           ) : null}
         </View>
       )}
@@ -120,25 +124,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  list: { padding: spacing.lg, paddingBottom: spacing.xl * 2, gap: spacing.md },
-  intro: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 21,
-    color: colors.textMuted,
-    marginBottom: spacing.md,
-  },
+  list: { padding: spacing.lg, gap: spacing.md },
   empty: {
     marginTop: spacing.xl,
     textAlign: "center",
     fontFamily: fonts.regular,
     color: colors.textMuted,
+    fontSize: 14,
   },
   card: {
     backgroundColor: colors.bgElevated,
     borderRadius: radii.lg,
     padding: spacing.lg,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
   cardTop: {

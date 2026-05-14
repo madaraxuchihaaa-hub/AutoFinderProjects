@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { CommonActions } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { apiGet } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
@@ -23,6 +25,7 @@ export default function AggregatedScreen({ navigation }: Props) {
   const [items, setItems] = useState<AggregatedRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const tabBarHeight = useBottomTabBarHeight();
 
   const load = useCallback(async () => {
     const data = await apiGet<AggregatedRow[]>("/api/aggregated?limit=50");
@@ -64,12 +67,17 @@ export default function AggregatedScreen({ navigation }: Props) {
     <FlatList
       data={items}
       keyExtractor={(it) => it.id}
-      contentContainerStyle={styles.list}
+      contentContainerStyle={[
+        styles.list,
+        { paddingBottom: tabBarHeight + spacing.lg },
+      ]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
           tintColor={colors.accent}
+          colors={Platform.OS === "android" ? [colors.accent] : undefined}
+          progressBackgroundColor={colors.bgElevated}
         />
       }
       renderItem={({ item }) => {
@@ -120,7 +128,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  list: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2 },
+  list: { padding: spacing.lg, gap: spacing.md },
   card: {
     flexDirection: "row",
     backgroundColor: colors.bgElevated,

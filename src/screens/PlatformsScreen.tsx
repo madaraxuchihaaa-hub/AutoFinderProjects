@@ -47,10 +47,6 @@ export default function PlatformsScreen(_props: Props) {
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.intro}>
-        Очередь публикаций связывает ваши карточки с этими площадками. Интеграции
-        подключаются на сервере без правок клиента.
-      </Text>
       {rows.map((p) => (
         <View key={p.id} style={styles.card}>
           <View style={styles.cardTop}>
@@ -79,13 +75,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   list: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2 },
-  intro: {
-    fontFamily: fonts.regular,
-    fontSize: 14,
-    lineHeight: 21,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
   card: {
     backgroundColor: colors.bgElevated,
     borderRadius: radii.lg,
