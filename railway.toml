@@ -1,0 +1,7 @@
+# Запуск Node API вместо корневого `expo start` (Metro).
+# В Railway: Settings → убедитесь, что не переопределён Start на что-то ещё, или оставьте пустым.
+#
+# Обязательная переменная окружения для входа/регистрации:
+#   JWT_SECRET — длинная случайная строка (32+ символов), в Variables сервиса API.
+[deploy]
+startCommand = "npm run start:railway"

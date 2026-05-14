@@ -1,0 +1,51 @@
+{
+  "name": "AutoFinderProject",
+  "version": "1.0.0",
+  "private": true,
+  "description": "продажа авто",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "start:railway": "npm start --prefix server",
+    "postinstall": "npm ci --prefix server",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "lint": "expo lint",
+    "build:web": "expo export --platform web",
+    "android:prebuild": "expo prebuild --platform android",
+    "android:apk:debug": "cd android && gradlew.bat assembleDebug",
+    "android:apk:release": "cd android && gradlew.bat assembleRelease",
+    "build:apk:local": "npm run android:apk:debug",
+    "build:apk:eas": "eas build -p android --profile preview-apk",
+    "build:apk": "npm run build:apk:local",
+    "build": "npm run build:web",
+    "build:with-apk": "npm run build:web && npm run build:apk:local",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "@expo-google-fonts/montserrat": "^0.4.2",
+    "@react-navigation/bottom-tabs": "^7.16.1",
+    "@react-navigation/native": "^7.2.4",
+    "@react-navigation/native-stack": "^7.15.1",
+    "expo": "~54.0.32",
+    "expo-constants": "~18.0.13",
+    "expo-font": "^55.0.7",
+    "expo-linear-gradient": "^55.0.14",
+    "expo-secure-store": "~15.0.8",
+    "expo-status-bar": "^55.0.6",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.0",
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-screens": "^4.25.0",
+    "react-native-web": "0.21.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/react": "~19.1.0",
+    "babel-preset-expo": "^55.0.21",
+    "eas-cli": "^16.0.0",
+    "typescript": "~5.9.2"
+  }
+}

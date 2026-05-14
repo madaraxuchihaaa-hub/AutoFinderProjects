@@ -1,0 +1,64 @@
+# Полный стек: PostgreSQL + API + статический web (Expo) за nginx.
+#
+# Запуск: docker compose up --build
+#   или с файлом переменных: docker compose --env-file .env.docker up --build
+# Web: http://localhost:8080  ·  API напрямую: http://localhost:3000
+#
+# Для телефона/эмулятора задайте EXPO_PUBLIC_API_URL=http://<IP_ПК>:3000 при локальном npm start.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-autofinder}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-autofinder}
+      PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET:-docker-dev-only-change-me-min-32-characters-long}
+      AUTO_SEED_DEMO: ${AUTO_SEED_DEMO:-0}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:3000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\"",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 25s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        EXPO_PUBLIC_API_URL: ""
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

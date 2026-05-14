@@ -1,0 +1,13 @@
+node_modules/
+.expo/
+dist/
+web-build/
+*.log
+.env
+.env.local
+.env.docker
+server/.env
+.DS_Store
+
+# Android SDK path (создайте из local.properties)
+android/local.properties

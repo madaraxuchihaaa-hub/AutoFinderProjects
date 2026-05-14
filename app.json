@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "AutoFinder",
+    "slug": "autofinder",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "autofinder",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F14"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.autofinder.app"
+    },
+    "android": {
+      "package": "com.autofinder.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ef483890-a6ca-4362-bf55-d255e54352d6"
+      }
+    }
+  }
+}
