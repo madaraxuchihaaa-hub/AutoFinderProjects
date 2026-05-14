@@ -25,6 +25,34 @@ export type ListingRow = {
   images: string[];
 };
 
+export type UserRole = "admin" | "moderator" | "user";
+
+export type PendingListingRow = {
+  id: string;
+  title: string;
+  brand: string;
+  model: string;
+  year: number;
+  mileage_km: number | null;
+  price_rub: string | number;
+  city: string | null;
+  description: string | null;
+  status: string;
+  created_at: string;
+  owner_email: string;
+  owner_id: string;
+  images: string[];
+};
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  full_name: string | null;
+  phone: string | null;
+  role: UserRole;
+  created_at: string;
+};
+
 export type StatsResponse = {
   aggregated: number;
   publishedListings: number;
@@ -56,8 +84,6 @@ export type CreateListingResponse = {
   id: string;
   status: string;
 };
-
-export type UserRole = "admin" | "moderator" | "user";
 
 export type AuthUser = {
   id: string;

@@ -49,7 +49,16 @@ type ListingDetail = {
   city: string | null;
   status: string;
   images: string[];
+  reject_reason?: string | null;
 };
+
+function listingStatusLabel(status: string): string {
+  if (status === "moderation") return "На проверке";
+  if (status === "published") return "Опубликовано";
+  if (status === "archived") return "Отклонено";
+  if (status === "draft") return "Черновик";
+  return status;
+}
 
 export default function VehicleDetailScreen({ route }: Props) {
   const { scope, id } = route.params;
@@ -159,10 +168,13 @@ export default function VehicleDetailScreen({ route }: Props) {
           />
         ) : null}
         <Text style={styles.badge}>
-          Гараж · {listing.status}
+          {listingStatusLabel(listing.status)}
         </Text>
         <Text style={styles.title}>{listing.title}</Text>
         <Text style={styles.price}>{formatRub(listing.price_rub)}</Text>
+        {listing.reject_reason ? (
+          <Text style={styles.rejectNote}>{listing.reject_reason}</Text>
+        ) : null}
         {listing.description ? (
           <Text style={styles.desc}>{listing.description}</Text>
         ) : null}
@@ -237,6 +249,14 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bold,
     fontSize: 22,
     color: colors.gold,
+  },
+  rejectNote: {
+    marginTop: spacing.sm,
+    marginHorizontal: spacing.lg,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.danger,
   },
   desc: {
     marginTop: spacing.md,

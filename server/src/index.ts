@@ -3,8 +3,9 @@ import dotenv from "dotenv";
 import express from "express";
 import { ensureJwtSecretConfigured } from "./auth/jwt.js";
 import { registerAuthRoutes } from "./auth/routes.js";
-import { requireAuth } from "./auth/middleware.js";
+import { optionalAuth, requireAdmin, requireAuth, requireStaff } from "./auth/middleware.js";
 import { registerProtectedListingRoutes } from "./listingsHandlers.js";
+import { registerStaffRoutes } from "./staffRoutes.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
 
@@ -92,7 +93,12 @@ app.get("/api/listings", async (req, res) => {
   res.json(rows);
 });
 
-app.get("/api/listings/:id", async (req, res) => {
+app.get("/api/listings/:id", optionalAuth, async (req, res) => {
+  const id = req.params.id;
+  const auth = req.auth;
+  const isStaff = auth?.role === "admin" || auth?.role === "moderator";
+  const userId = auth?.userId ?? null;
+
   const { rows } = await pool.query(
     `SELECT l.*,
             COALESCE(
@@ -101,8 +107,13 @@ app.get("/api/listings/:id", async (req, res) => {
               '[]'::json
             ) AS images
      FROM listings l
-     WHERE l.id = $1`,
-    [req.params.id]
+     WHERE l.id = $1
+       AND (
+         l.status = 'published'
+         OR ($2::uuid IS NOT NULL AND l.user_id = $2::uuid)
+         OR $3::boolean
+       )`,
+    [id, userId, isStaff]
   );
   if (!rows[0]) {
     res.status(404).json({ error: "not_found" });
@@ -122,6 +133,7 @@ app.get("/api/queue/summary", async (_req, res) => {
 
 registerAuthRoutes(app, pool);
 registerProtectedListingRoutes(app, pool, requireAuth);
+registerStaffRoutes(app, pool, requireAuth, requireStaff, requireAdmin);
 
 const port = Number(process.env.PORT ?? 3000);
 

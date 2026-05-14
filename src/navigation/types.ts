@@ -6,6 +6,7 @@ export type MainTabParamList = {
   Market: undefined;
   Garage: undefined;
   Automation: undefined;
+  Staff: undefined;
   Profile: undefined;
 };
 

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
+import { useAuth } from "../auth/AuthContext";
 import { apiPost } from "../api/client";
 import type { RootStackParamList } from "../navigation/types";
 import type { CreateListingResponse } from "../types/api";
@@ -21,6 +22,7 @@ import { colors, fonts, radii, spacing } from "../theme";
 type Props = NativeStackScreenProps<RootStackParamList, "CreateListing">;
 
 export default function CreateListingScreen({ navigation }: Props) {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
@@ -58,7 +60,7 @@ export default function CreateListingScreen({ navigation }: Props) {
     const mileage_km = mileage.trim() ? Number(mileage.replace(/\s/g, "")) : undefined;
     setBusy(true);
     try {
-      await apiPost<CreateListingResponse>("/api/listings", {
+      const res = await apiPost<CreateListingResponse>("/api/listings", {
         title: title.trim(),
         brand: brand.trim(),
         model: model.trim(),
@@ -75,7 +77,11 @@ export default function CreateListingScreen({ navigation }: Props) {
         body_type: body.trim() || undefined,
         image_urls,
       });
-      Alert.alert("Готово", "Объявление опубликовано.", [
+      const msg =
+        res.status === "moderation"
+          ? "Объявление отправлено на проверку. После одобрения модератором оно появится в каталоге и в очереди публикаций."
+          : "Объявление опубликовано.";
+      Alert.alert("Готово", msg, [
         {
           text: "OK",
           onPress: () => {
@@ -106,6 +112,9 @@ export default function CreateListingScreen({ navigation }: Props) {
         <Text style={styles.hint}>
           Фото — ссылки HTTPS, по строке или через запятую.
         </Text>
+        {user?.role === "user" ? (
+          <Text style={styles.hint2}>Обычный пользователь: объявление сначала на модерации.</Text>
+        ) : null}
         <Field label="Заголовок" value={title} onChangeText={setTitle} ph="Напр. BMW 320i, один владелец" />
         <Row>
           <FieldSmall label="Марка" value={brand} onChangeText={setBrand} ph="BMW" />
@@ -222,6 +231,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     color: colors.textMuted,
+    marginBottom: spacing.lg,
+  },
+  hint2: {
+    fontFamily: fonts.medium,
+    fontSize: 12,
+    lineHeight: 17,
+    color: colors.accent,
+    marginTop: -spacing.md,
     marginBottom: spacing.lg,
   },
   field: { marginBottom: spacing.md },

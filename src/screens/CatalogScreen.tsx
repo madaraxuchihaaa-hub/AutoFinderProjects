@@ -21,6 +21,40 @@ import { formatKm, formatRub } from "../utils/format";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Garage">;
 
+function StatusChip({ status }: { status: string }) {
+  const label =
+    status === "moderation"
+      ? "Проверка"
+      : status === "published"
+        ? "Онлайн"
+        : status === "archived"
+          ? "Отказ"
+          : status === "draft"
+            ? "Черновик"
+            : status;
+  const wrapStyle =
+    status === "published"
+      ? styles.chipOk
+      : status === "moderation"
+        ? styles.chipWait
+        : status === "archived"
+          ? styles.chipBad
+          : styles.chipNeu;
+  const txtStyle =
+    status === "published"
+      ? styles.chipTxtOk
+      : status === "moderation"
+        ? styles.chipTxtWait
+        : status === "archived"
+          ? styles.chipTxtBad
+          : styles.chipTxtNeu;
+  return (
+    <View style={[styles.chip, wrapStyle]}>
+      <Text style={[styles.chipTxt, txtStyle]}>{label}</Text>
+    </View>
+  );
+}
+
 export default function CatalogScreen({ navigation }: Props) {
   const [items, setItems] = useState<ListingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +62,7 @@ export default function CatalogScreen({ navigation }: Props) {
   const tabBarHeight = useBottomTabBarHeight();
 
   const load = useCallback(async () => {
-    const data = await apiGet<ListingRow[]>("/api/listings?limit=50");
+    const data = await apiGet<ListingRow[]>("/api/me/listings");
     setItems(data);
   }, []);
 
@@ -105,9 +139,12 @@ export default function CatalogScreen({ navigation }: Props) {
               <View style={[styles.thumb, styles.thumbPh]} />
             )}
             <View style={styles.cardBody}>
-              <Text style={styles.cardTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
+              <View style={styles.titleRow}>
+                <Text style={styles.cardTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                <StatusChip status={item.status} />
+              </View>
               <Text style={styles.meta}>
                 {[item.brand, item.model, item.year].join(" · ")}
               </Text>
@@ -150,11 +187,34 @@ const styles = StyleSheet.create({
   },
   thumb: { width: 112, height: 112 },
   thumbPh: { backgroundColor: colors.surface },
-  cardBody: { flex: 1, padding: spacing.md, justifyContent: "center" },
+  cardBody: { flex: 1, padding: spacing.md, justifyContent: "center", minWidth: 0 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  chip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.sm,
+    flexShrink: 0,
+  },
+  chipTxt: { fontFamily: fonts.semibold, fontSize: 10, letterSpacing: 0.3 },
+  chipTxtOk: { color: colors.success },
+  chipTxtWait: { color: colors.accent },
+  chipTxtBad: { color: colors.danger },
+  chipTxtNeu: { color: colors.textMuted },
+  chipOk: { backgroundColor: "rgba(92,227,138,0.15)" },
+  chipWait: { backgroundColor: colors.accentDim },
+  chipBad: { backgroundColor: "rgba(255,107,107,0.12)" },
+  chipNeu: { backgroundColor: colors.surface },
   cardTitle: {
     fontFamily: fonts.semibold,
     fontSize: 15,
     color: colors.text,
+    flex: 1,
+    minWidth: 0,
   },
   meta: {
     marginTop: 4,

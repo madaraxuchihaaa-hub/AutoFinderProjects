@@ -1,13 +1,34 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
+import { enqueuePublicationQueue } from "./listingQueue.js";
 
 export function registerProtectedListingRoutes(
   app: Express,
   pool: Pool,
   requireAuth: RequestHandler
 ): void {
+  app.get("/api/me/listings", requireAuth, async (req, res) => {
+    const { rows } = await pool.query(
+      `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_rub, l.city, l.status, l.created_at,
+              COALESCE(
+                (SELECT json_agg(url ORDER BY sort_order)
+                 FROM listing_images li WHERE li.listing_id = l.id),
+                '[]'::json
+              ) AS images
+       FROM listings l
+       WHERE l.user_id = $1
+       ORDER BY l.created_at DESC
+       LIMIT 100`,
+      [req.auth!.userId]
+    );
+    res.json(rows);
+  });
+
   app.post("/api/listings", requireAuth, async (req, res) => {
     const userId = req.auth!.userId;
+    const role = req.auth!.role;
+    const staffPublish = role === "admin" || role === "moderator";
+    const initialStatus = staffPublish ? "published" : "moderation";
 
     const b = req.body as Record<string, unknown>;
     const title = String(b.title ?? "").trim();
@@ -44,7 +65,7 @@ export function registerProtectedListingRoutes(
         `INSERT INTO listings (
            user_id, title, description, brand, model, year, mileage_km, price_rub,
            fuel_type, transmission, body_type, city, status, source
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'published','user')
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'user')
          RETURNING id`,
         [
           userId,
@@ -59,6 +80,7 @@ export function registerProtectedListingRoutes(
           transmission ? transmission.slice(0, 40) : null,
           body_type ? body_type.slice(0, 40) : null,
           city ? city.slice(0, 80) : null,
+          initialStatus,
         ]
       );
       const listingId = ins.rows[0].id;
@@ -72,20 +94,12 @@ export function registerProtectedListingRoutes(
         );
       }
 
-      const plats = await client.query<{ id: number }>(
-        "SELECT id FROM platforms WHERE code IN ('avito', 'drom', 'auto_ru') AND is_active = TRUE"
-      );
-      for (const p of plats.rows) {
-        await client.query(
-          `INSERT INTO publication_queue (listing_id, platform_id, status, scheduled_at)
-           VALUES ($1, $2, 'pending', NOW())
-           ON CONFLICT (listing_id, platform_id) DO NOTHING`,
-          [listingId, p.id]
-        );
+      if (staffPublish) {
+        await enqueuePublicationQueue(client, listingId);
       }
 
       await client.query("COMMIT");
-      res.status(201).json({ id: listingId, status: "published" });
+      res.status(201).json({ id: listingId, status: initialStatus });
     } catch (e) {
       await client.query("ROLLBACK");
       console.error(e);

@@ -4,11 +4,13 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useMemo } from "react";
 import { Platform, Pressable, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useAuth } from "../auth/AuthContext";
 import AggregatedScreen from "../screens/AggregatedScreen";
 import CatalogScreen from "../screens/CatalogScreen";
 import HomeScreen from "../screens/HomeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import QueueScreen from "../screens/QueueScreen";
+import StaffPanelScreen from "../screens/StaffPanelScreen";
 import { colors, fonts } from "../theme";
 import type { MainTabParamList } from "./types";
 
@@ -22,6 +24,8 @@ function tabBarBottomPadding(insetsBottom: number): number {
 
 export default function MainTabs() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
+  const staff = user?.role === "admin" || user?.role === "moderator";
   const padBottom = tabBarBottomPadding(insets.bottom);
   const barHeight = 52 + padBottom;
 
@@ -126,6 +130,24 @@ export default function MainTabs() {
           ),
         }}
       />
+      {staff ? (
+        <Tab.Screen
+          name="Staff"
+          component={StaffPanelScreen}
+          options={{
+            title: user?.role === "admin" ? "Админ" : "Модерация",
+            tabBarLabel: user?.role === "admin" ? "Админ" : "Модерация",
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons
+                name={user?.role === "admin" ? "speedometer-outline" : "shield-checkmark-outline"}
+                color={color}
+                size={size + (Platform.OS === "android" ? 1 : 0)}
+              />
+            ),
+          }}
+        />
+      ) : null}
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
