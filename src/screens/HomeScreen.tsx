@@ -95,7 +95,7 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.warnText}>{err}</Text>
             <Text style={styles.warnHint}>
               {isStandaloneAppWithoutApiEnv()
-                ? "В корне проекта создайте файл .env с строкой EXPO_PUBLIC_API_URL=https://ваш-проект.up.railway.app (без слэша в конце), затем заново соберите APK (npm run android:apk:debug)."
+                ? "В корне проекта создайте файл .env с строкой EXPO_PUBLIC_API_URL=https://autofinderprojects-production.up.railway.app (без слэша в конце), затем заново соберите APK (npm run android:apk:debug)."
                 : hasRemoteApiUrl()
                   ? "Проверьте, что API на Railway запущен и открывается в браузере по этому же адресу (/health)."
                   : "Для Expo на телефоне: в .env укажите EXPO_PUBLIC_API_URL на Railway или запустите API на ПК (npm run server) в той же Wi‑Fi сети. Для эмулятора достаточно локального сервера."}
