@@ -7,12 +7,22 @@ import { requireAuth } from "./auth/middleware.js";
 import { registerProtectedListingRoutes } from "./listingsHandlers.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
-import { seedDemoIfNeeded } from "./seedDemo.js";
+import { attachSessionMiddleware } from "./session/attachSession.js";
+import { ensureSessionCompareAndCsrf, registerWebSessionRoutes } from "./web/webRoutes.js";
+import { registerCatalogListRoute } from "./routes/catalogListRoute.js";
 
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: true }));
+
+app.use(
+  cors({
+    origin: true,
+    credentials: true,
+  })
+);
+
+attachSessionMiddleware(app, pool);
 app.use(express.json());
 
 app.get("/api/stats", async (_req, res) => {
@@ -75,41 +85,56 @@ app.get("/api/aggregated/:id", async (req, res) => {
   res.json(rows[0]);
 });
 
-app.get("/api/listings", async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 30, 100);
-  const { rows } = await pool.query(
-    `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_rub, l.city, l.status, l.created_at,
-            COALESCE(
-              (SELECT json_agg(url ORDER BY sort_order)
-               FROM listing_images li WHERE li.listing_id = l.id),
-              '[]'::json
-            ) AS images
-     FROM listings l
-     WHERE l.status = 'published'
-     ORDER BY l.created_at DESC
-     LIMIT $1`,
-    [limit]
-  );
-  res.json(rows);
-});
+registerCatalogListRoute(app, pool);
+registerWebSessionRoutes(app, pool);
 
 app.get("/api/listings/:id", async (req, res) => {
+  ensureSessionCompareAndCsrf(req);
+  const id = req.params.id;
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidRe.test(id)) {
+    res.status(400).json({ error: "validation" });
+    return;
+  }
+
   const { rows } = await pool.query(
     `SELECT l.*,
+            u.full_name AS seller_full_name,
             COALESCE(
               (SELECT json_agg(url ORDER BY sort_order)
                FROM listing_images li WHERE li.listing_id = l.id),
               '[]'::json
             ) AS images
      FROM listings l
+     LEFT JOIN users u ON u.id = l.user_id
      WHERE l.id = $1`,
-    [req.params.id]
+    [id]
   );
   if (!rows[0]) {
     res.status(404).json({ error: "not_found" });
     return;
   }
-  res.json(rows[0]);
+
+  const row = rows[0] as Record<string, unknown> & {
+    images: unknown;
+    seller_full_name: string | null;
+  };
+  const { images, seller_full_name, ...listingRow } = row;
+  const paths = Array.isArray(images) ? (images as string[]) : [];
+  const compareIds = (req.session.compareIds ?? []).filter((x): x is string => typeof x === "string");
+  const isCompared = compareIds.includes(id);
+
+  res.json({
+    listing: {
+      ...listingRow,
+      brandName: listingRow.brand,
+      modelName: listingRow.model,
+      photoPaths: paths,
+    },
+    seller: seller_full_name ? { fullName: seller_full_name } : null,
+    isCompared,
+  });
 });
 
 app.get("/api/queue/summary", async (_req, res) => {
@@ -129,7 +154,6 @@ const port = Number(process.env.PORT ?? 3000);
 async function main() {
   ensureJwtSecretConfigured();
   await runMigrations(pool);
-  await seedDemoIfNeeded();
   app.listen(port, () => {
     console.info(`AutoFinder API → http://localhost:${port}`);
   });

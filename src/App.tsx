@@ -1,24 +1,9 @@
-import { NavigationContainer, DarkTheme, Theme } from "@react-navigation/native";
-import { useEffect } from "react";
 import { ActivityIndicator, StatusBar, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useEffect } from "react";
 import { useAppFonts } from "./fonts";
-import { AuthProvider } from "./auth/AuthContext";
-import RootNavigator from "./navigation/RootNavigator";
+import MobileShell from "./screens/MobileShell";
 import { colors } from "./theme";
-
-const navTheme: Theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.accent,
-    background: colors.bg,
-    card: colors.bgElevated,
-    text: colors.text,
-    border: colors.border,
-    notification: colors.accent,
-  },
-};
 
 export default function App() {
   const [loaded, err] = useAppFonts();
@@ -30,6 +15,7 @@ export default function App() {
   if (!loaded) {
     return (
       <View style={styles.boot}>
+        <StatusBar barStyle="light-content" />
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
@@ -37,12 +23,8 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar barStyle="light-content" />
-        <NavigationContainer theme={navTheme}>
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <StatusBar barStyle="light-content" />
+      <MobileShell />
     </SafeAreaProvider>
   );
 }
