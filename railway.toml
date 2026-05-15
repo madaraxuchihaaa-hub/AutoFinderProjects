@@ -1,7 +1,15 @@
-# Запуск Node API вместо корневого `expo start` (Metro).
-# В Railway: Settings → убедитесь, что не переопределён Start на что-то ещё, или оставьте пустым.
+# API + веб (server/public) на одном порту. Expo web здесь не собирается.
 #
-# Обязательная переменная окружения для входа/регистрации:
-#   JWT_SECRET — длинная случайная строка (32+ символов), в Variables сервиса API.
+# Переменные в Railway → Variables:
+#   JWT_SECRET      — случайная строка 32+ символов
+#   DATABASE_URL    — PostgreSQL (или PGHOST/PGUSER/…)
+#   PUBLIC_BASE_URL — https://<ваш-домен> (URL картинок /uploads)
+#
+# Быстрее: Settings → Root Directory = server (тогда startCommand = npm start).
+[build]
+buildCommand = "npm run build:railway"
+
 [deploy]
 startCommand = "npm run start:railway"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
