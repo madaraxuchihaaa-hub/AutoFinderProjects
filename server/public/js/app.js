@@ -10,6 +10,13 @@ import {
   label,
 } from "./labels.js";
 import { CMP_MAX, createSavedStore } from "./saved.js";
+import {
+  attrEsc,
+  firstImageUrl,
+  imgTag,
+  parseImagesField,
+  resolveMediaUrl,
+} from "./media.js";
 
 const TOKEN_KEY = "af_token";
 const USER_KEY = "af_user";
@@ -104,11 +111,6 @@ function fmtDt(s) {
   return `${dd}.${mm} ${hh}:${mi}`;
 }
 
-function firstImg(item) {
-  const imgs = item.images;
-  return Array.isArray(imgs) && imgs[0] ? imgs[0] : null;
-}
-
 function parseRoute() {
   const hash = location.hash.replace(/^#/, "") || "/listings";
   const [path, qs] = hash.split("?");
@@ -173,7 +175,7 @@ function renderNav() {
 }
 
 function catalogCard(item, opts = {}) {
-  const img = firstImg(item);
+  const img = firstImageUrl(item);
   const isFav = saved?.isFavorite(item.id);
   const isCmp = saved?.isCompared(item.id);
   const user = getUser();
@@ -192,7 +194,7 @@ function catalogCard(item, opts = {}) {
           <div class="catalog-card__photo">
             ${
               img
-                ? `<img src="${esc(img)}" alt="${esc(title)}" loading="lazy" />`
+                ? imgTag(img, title, "catalog-card__img")
                 : `<div class="catalog-card__ph-empty">Нет фото</div>`
             }
             <div class="catalog-card__badgebar">
@@ -317,9 +319,9 @@ async function pageListings(query) {
   ]);
 
   let items = data.items || [];
-  if (query.has_photo) items = items.filter((i) => firstImg(i));
+  if (query.has_photo) items = items.filter((i) => firstImageUrl(i));
   const total = query.has_photo ? items.length : (data.total ?? items.length);
-  const withPhotos = items.filter((i) => firstImg(i)).length;
+  const withPhotos = items.filter((i) => firstImageUrl(i)).length;
   const page = Number(query.page) || 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -516,7 +518,9 @@ async function pageListing(id) {
   app.innerHTML = `<p class="loading">Загрузка…</p>`;
   const item = await api(`/api/listings/${encodeURIComponent(id)}`);
   const user = getUser();
-  const imgs = Array.isArray(item.images) ? item.images : [];
+  const imgs = parseImagesField(item.images)
+    .map((p) => resolveMediaUrl(p))
+    .filter(Boolean);
   const mainSrc = imgs[0] || null;
   const paramLine = [
     item.year ? `${item.year} г.` : null,
@@ -535,7 +539,7 @@ async function pageListing(id) {
       ? `<div class="ls-av__nav" role="tablist">${imgs
           .map(
             (p, i) =>
-              `<button type="button" class="ls-av__nav-btn${i === 0 ? " is-active" : ""}" data-src="${esc(p)}" aria-label="Фото ${i + 1}"><img src="${esc(p)}" alt="" loading="lazy" width="144" height="108" /></button>`
+              `<button type="button" class="ls-av__nav-btn${i === 0 ? " is-active" : ""}" data-src="${attrEsc(p)}" aria-label="Фото ${i + 1}">${imgTag(p, "", "ls-av__thumb")}</button>`
           )
           .join("")}</div>`
       : "";
@@ -556,7 +560,7 @@ async function pageListing(id) {
           <div class="ls-av__stage">
             ${
               mainSrc
-                ? `<img class="ls-av__stage-img" src="${esc(mainSrc)}" alt="${esc(item.title)}" width="800" height="600" />`
+                ? imgTag(mainSrc, item.title, "ls-av__stage-img")
                 : `<div class="ls-av__stage-placeholder">Нет фотографий</div>`
             }
           </div>
@@ -763,9 +767,9 @@ async function pageCompare() {
     </section>
     <div class="compare-grid">${valid
       .map((item) => {
-        const img = firstImg(item);
+        const img = firstImageUrl(item);
         return `<section class="card compare-card">
-          <div class="compare-card__media">${img ? `<img src="${esc(img)}" alt="" loading="lazy" />` : `<div class="placeholder">Нет фото</div>`}</div>
+          <div class="compare-card__media">${img ? imgTag(img, "", "compare-card__img") : `<div class="placeholder">Нет фото</div>`}</div>
           <h2 class="compare-card__title"><a href="#/listings/${esc(item.id)}">${esc(item.brand)} ${esc(item.model)}</a></h2>
           <p class="compare-card__price">${fmtByn(item.price_byn)}</p>
           <div class="compare-card__actions">
@@ -928,9 +932,9 @@ async function pageMyListings() {
     <section class="hero"><h1>Мои объявления</h1></section>
     <div class="profile-listings">
       ${rows.length ? rows.map((item) => {
-        const img = firstImg(item);
+        const img = firstImageUrl(item);
         return `<article class="card profile-listing-card">
-          <div class="profile-listing-card__media">${img ? `<img src="${esc(img)}" alt="" />` : `<div class="placeholder">Нет фото</div>`}</div>
+          <div class="profile-listing-card__media">${img ? imgTag(img, "", "profile-listing-card__img") : `<div class="placeholder">Нет фото</div>`}</div>
           <div class="profile-listing-card__body">
             <div class="profile-listing-card__head"><div><h2><a href="#/listings/${esc(item.id)}">${esc(item.title || `${item.brand} ${item.model}`)}</a></h2><p class="muted small">${esc(STATUS[item.status] || item.status)}</p></div><div class="profile-listing-card__price">${fmtByn(item.price_byn)}</div></div>
             <div class="profile-listing-card__actions"><a class="button ghost" href="#/listings/${esc(item.id)}">Открыть</a></div>

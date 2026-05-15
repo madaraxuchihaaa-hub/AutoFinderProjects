@@ -1,5 +1,6 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
+import { getPublicOrigin, withNormalizedImagesList } from "./mediaUrls.js";
 
 const CMP_MAX = 3;
 
@@ -27,7 +28,7 @@ export function registerSavedListingRoutes(
        LIMIT 100`,
       [userId]
     );
-    res.json(rows);
+    res.json(withNormalizedImagesList(rows, getPublicOrigin(req)));
   });
 
   app.get("/api/me/favorites/ids", requireAuth, async (req, res) => {
@@ -80,7 +81,7 @@ export function registerSavedListingRoutes(
        LIMIT ${CMP_MAX}`,
       [userId]
     );
-    res.json(rows);
+    res.json(withNormalizedImagesList(rows, getPublicOrigin(req)));
   });
 
   app.get("/api/me/compare/ids", requireAuth, async (req, res) => {

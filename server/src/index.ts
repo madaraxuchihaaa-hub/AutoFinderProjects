@@ -12,6 +12,7 @@ import { getUsdPerByn, bynToUsd } from "./exchangeRates.js";
 import { parseListingSearchQuery, searchPublishedListings } from "./listingSearch.js";
 import { registerStaffRoutes } from "./staffRoutes.js";
 import { registerSavedListingRoutes } from "./savedListingRoutes.js";
+import { getPublicOrigin, withNormalizedImages, withNormalizedImagesList } from "./mediaUrls.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
 import { seedCarCatalogIfNeeded } from "./seedCarCatalog.js";
@@ -127,18 +128,19 @@ app.get("/api/listings", async (req, res) => {
     params.generation ||
     params.q;
 
+  const origin = getPublicOrigin(req);
   if (hasFilters || req.query.search === "1") {
     const { rows, total } = await searchPublishedListings(pool, {
       ...params,
       limit: params.limit ?? 50,
     });
-    res.json({ items: rows, total });
+    res.json({ items: withNormalizedImagesList(rows, origin), total });
     return;
   }
 
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const { rows, total } = await searchPublishedListings(pool, { limit });
-  res.json({ items: rows, total });
+  res.json({ items: withNormalizedImagesList(rows, origin), total });
 });
 
 app.get("/api/listings/:id", optionalAuth, async (req, res) => {
@@ -175,7 +177,7 @@ app.get("/api/listings/:id", optionalAuth, async (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
-  res.json(rows[0]);
+  res.json(withNormalizedImages(rows[0], getPublicOrigin(req)));
 });
 
 app.get("/api/queue/summary", async (_req, res) => {

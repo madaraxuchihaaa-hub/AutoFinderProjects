@@ -3,6 +3,7 @@ import type { Pool } from "pg";
 import { enqueuePublicationQueue } from "./listingQueue.js";
 import { validateBrandModel } from "./vehicleRoutes.js";
 import { validateByPhone, validateByPlate, normalizeByPlate } from "./validation/by.js";
+import { getPublicOrigin, withNormalizedImagesList } from "./mediaUrls.js";
 
 function parsePriceByn(b: Record<string, unknown>): number {
   if (b.price_byn !== undefined) return Number(b.price_byn);
@@ -30,7 +31,7 @@ export function registerProtectedListingRoutes(
        LIMIT 100`,
       [req.auth!.userId]
     );
-    res.json(rows);
+    res.json(withNormalizedImagesList(rows, getPublicOrigin(req)));
   });
 
   app.post("/api/listings", requireAuth, async (req, res) => {
