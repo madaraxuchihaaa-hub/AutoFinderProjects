@@ -10,7 +10,6 @@ import StaffReviewListingScreen from "../screens/StaffReviewListingScreen";
 import FavoritesScreen from "../screens/FavoritesScreen";
 import LoginScreen from "../screens/LoginScreen";
 import MainTabs from "./MainTabs";
-import PlatformsScreen from "../screens/PlatformsScreen";
 import RegisterScreen from "../screens/RegisterScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import VehicleDetailScreen from "../screens/VehicleDetailScreen";
@@ -106,11 +105,6 @@ export default function RootNavigator() {
       <Stack.Screen name="Compare" component={CompareScreen} options={{ title: "Сравнение" }} />
       {token ? (
         <>
-          <Stack.Screen
-            name="Platforms"
-            component={PlatformsScreen}
-            options={({ navigation }) => modalScreenOptions("Площадки размещения", navigation)}
-          />
           <Stack.Screen
             name="CreateListing"
             component={CreateListingScreen}

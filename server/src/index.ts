@@ -6,6 +6,7 @@ import { registerAuthRoutes } from "./auth/routes.js";
 import { optionalAuth, requireAdmin, requireAuth, requireStaff } from "./auth/middleware.js";
 import { registerProtectedListingRoutes } from "./listingsHandlers.js";
 import { registerAdminUserRoutes } from "./adminUserRoutes.js";
+import { registerAdminListingRoutes } from "./adminListingRoutes.js";
 import { registerChatRoutes } from "./chatRoutes.js";
 import { getUsdPerByn, bynToUsd } from "./exchangeRates.js";
 import { parseListingSearchQuery, searchPublishedListings } from "./listingSearch.js";
@@ -16,6 +17,7 @@ import { getPublicOrigin, withNormalizedImages, withNormalizedImagesList } from 
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
 import { seedCarCatalogIfNeeded } from "./seedCarCatalog.js";
+import { seedTestListingsFromManifest } from "./seedTestListings.js";
 import { registerUploadRoutes } from "./uploadRoutes.js";
 import { registerVehicleRoutes } from "./vehicleRoutes.js";
 import { hasWebBuild, registerWeb } from "./serveWeb.js";
@@ -66,13 +68,6 @@ app.get("/health", async (_req, res) => {
   } catch {
     res.status(500).json({ ok: false, db: "down" });
   }
-});
-
-app.get("/api/platforms", async (_req, res) => {
-  const { rows } = await pool.query(
-    "SELECT id, code, name, base_url, is_active FROM platforms WHERE is_active = TRUE ORDER BY id"
-  );
-  res.json(rows);
 });
 
 app.get("/api/aggregated", async (req, res) => {
@@ -138,13 +133,19 @@ app.get("/api/listings", async (req, res) => {
       ...params,
       limit: params.limit ?? 50,
     });
-    res.json({ items: withNormalizedImagesList(rows, origin), total });
+    res.json({
+      items: withNormalizedImagesList(rows as { images?: unknown }[], origin),
+      total,
+    });
     return;
   }
 
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const { rows, total } = await searchPublishedListings(pool, { limit });
-  res.json({ items: withNormalizedImagesList(rows, origin), total });
+  res.json({
+    items: withNormalizedImagesList(rows as { images?: unknown }[], origin),
+    total,
+  });
 });
 
 app.get("/api/listings/:id", optionalAuth, async (req, res) => {
@@ -208,6 +209,7 @@ registerUploadRoutes(app, requireAuth);
 registerAuthRoutes(app, pool);
 registerProtectedListingRoutes(app, pool, requireAuth);
 registerAdminUserRoutes(app, pool, requireAuth, requireAdmin);
+registerAdminListingRoutes(app, pool, requireAuth, requireAdmin);
 registerChatRoutes(app, pool, requireAuth);
 registerStaffRoutes(app, pool, requireAuth, requireStaff);
 registerSavedListingRoutes(app, pool, requireAuth);
@@ -220,6 +222,9 @@ async function main() {
   ensureJwtSecretConfigured();
   await runMigrations(pool);
   await seedCarCatalogIfNeeded(pool);
+  if (process.env.SEED_TEST_DATA === "1") {
+    await seedTestListingsFromManifest(pool);
+  }
   app.listen(port, () => {
     const web = hasWebBuild() ? " · web" : "";
     console.info(`AutoFinder → http://localhost:${port}${web}  (API: /api/…)`);

@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "build": "node -e \"console.log('server: no compile step')\"",
-    "resync:catalog": "tsx scripts/resync-vehicle-catalog.mjs"
+    "resync:catalog": "tsx scripts/resync-vehicle-catalog.mjs",
+    "seed:test-data": "tsx src/seedTestListingsCli.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

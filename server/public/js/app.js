@@ -194,8 +194,8 @@ function parseRoute() {
   const query = Object.fromEntries(new URLSearchParams(qs || ""));
   if (parts[0] === "home") return { page: "home", query };
   if (parts[0] === "feed" && parts[1]) return { page: "feed", id: parts[1], query };
-  if (parts[0] === "platforms") return { page: "platforms", query };
   if (parts[0] === "settings") return { page: "settings", query };
+  if (parts[0] === "admin") return { page: "admin", query };
   if (parts[0] === "staff" && parts[1]) return { page: "staff-review", id: parts[1], query };
   if (parts[0] === "staff") return { page: "staff", query };
   if (parts[0] === "listings" && parts[1]) return { page: "listing", id: parts[1], query };
@@ -225,7 +225,6 @@ function renderNav() {
     <a href="${navHref("/home")}">Главная</a>
     <a href="${navHref("/listings")}">Каталог</a>
     <a href="${navHref("/compare")}">Сравнение${cmp ? ` (${cmp})` : ""}</a>
-    <a href="${navHref("/platforms")}">Площадки</a>
     <a href="${navHref("/help")}">Справка</a>
   `;
   if (user) {
@@ -237,11 +236,11 @@ function renderNav() {
       <a href="${navHref("/messages")}">Сообщения</a>
       <a href="${navHref("/settings")}">Тема</a>
     `;
-    if (user.role === "moderator" || user.role === "admin") {
+    if (user.role === "moderator") {
       html += `<a href="${navHref("/staff")}">Модерация</a>`;
     }
     if (user.role === "admin") {
-      html += `<span class="muted small" title="Роли и пользователи — в приложении">Админ</span>`;
+      html += `<a href="${navHref("/admin")}">Админ-панель</a>`;
     }
     html += `<button type="button" class="linkish" id="btn-logout">Выйти (${esc(user.full_name || user.email)})</button>`;
   } else {
@@ -1000,7 +999,7 @@ function pageHelp() {
     <section class="card help-section"><h2>2. Как связаться с продавцом</h2><ul><li>Если продавец разрешил показ телефона — кнопка «Позвонить продавцу».</li><li>Напишите через форму сообщения на странице объявления (нужен вход).</li><li>Все переписки — в разделе «Сообщения».</li></ul></section>
     <section class="card help-section"><h2>3. Как разместить объявление</h2><ol><li>Зарегистрируйтесь или войдите.</li><li>Подайте объявление на сайте (<a href="#/create">форма</a>) или в мобильном приложении.</li><li>После сохранения объявление может перейти на модерацию.</li></ol></section>
     <section class="card help-section"><h2>4. Избранное и сравнение</h2><ul><li>После входа избранное и сравнение (до ${CMP_MAX} авто) синхронизируются с мобильным приложением.</li><li>Без входа данные хранятся только в этом браузере.</li><li>Калькулятор платежа на странице объявления — ориентировочный.</li></ul></section>
-    <section class="card help-section"><h2>5. Модерация и админ</h2><p>Модераторы и администраторы обрабатывают заявки на <a href="#/staff">странице модерации</a> (как в приложении). Управление пользователями и ролями — в мобильном приложении.</p></section>
+    <section class="card help-section"><h2>5. Модерация и админ</h2><p>Модераторы обрабатывают заявки на <a href="#/staff">странице модерации</a>. Администраторы пользуются <a href="#/admin">админ-панелью</a> на сайте: модерация, пользователи и поиск по всем объявлениям.</p></section>
   `;
 }
 
@@ -1119,33 +1118,6 @@ async function pageFeed(id) {
   `;
 }
 
-async function pagePlatforms() {
-  const app = $("#app");
-  document.title = "Площадки — AutoFinder";
-  app.innerHTML = `<p class="loading">Загрузка…</p>`;
-  let rows = [];
-  try {
-    rows = await api("/api/platforms");
-  } catch {
-    rows = [];
-  }
-  const body = rows.length
-    ? rows
-        .map(
-          (p) => `
-      <article class="card" style="margin-bottom:0.75rem">
-        <strong>${esc(p.name)}</strong> <span class="muted small">${esc(p.code)}</span>
-        ${p.base_url ? `<p class="muted small" style="margin:0.35rem 0 0"><a href="${attrEsc(p.base_url)}" rel="noopener noreferrer" target="_blank">${esc(p.base_url)}</a></p>` : ""}
-      </article>`
-        )
-        .join("")
-    : '<p class="muted">Список площадок пуст.</p>';
-  app.innerHTML = `
-    <section class="hero"><h1>Площадки размещения</h1><p class="muted">Источники объявлений в общей ленте (как в приложении).</p></section>
-    ${body}
-  `;
-}
-
 function pageSettings() {
   const app = $("#app");
   document.title = "Тема оформления — AutoFinder";
@@ -1167,6 +1139,258 @@ function pageSettings() {
       pageSettings();
     });
   });
+}
+
+function isAdminUser() {
+  const u = getUser();
+  return Boolean(u && u.role === "admin");
+}
+
+function staffPendingCardsInnerHtml(rows) {
+  if (!rows.length) return '<p class="empty">Нет заявок на модерации.</p>';
+  return rows
+    .map((row) => {
+      const img = firstImageUrl(row);
+      return `<article class="staff-card">
+            <div>${img ? imgTag(img, row.title, "profile-listing-card__img") : `<div class="placeholder">Нет фото</div>`}</div>
+            <div class="staff-card__meta">
+              <strong><a href="#/staff/${esc(row.id)}">${esc(row.title)}</a></strong>
+              <div class="muted small">${esc(row.brand)} ${esc(row.model)} · ${esc(String(row.year || ""))}</div>
+              <div class="muted small">${esc(row.owner_email || "")}</div>
+            </div>
+            <a class="button" href="#/staff/${esc(row.id)}">Проверить</a>
+          </article>`;
+    })
+    .join("");
+}
+
+function adminTabHref(tab) {
+  return `#/admin?tab=${encodeURIComponent(tab)}`;
+}
+
+function renderAdminTabs(activeTab) {
+  const tabs = [
+    { id: "moderation", label: "Модерация" },
+    { id: "users", label: "Пользователи" },
+    { id: "listings", label: "Объявления" },
+  ];
+  return `<nav class="admin-tabs" aria-label="Разделы админ-панели">${tabs
+    .map(
+      (t) =>
+        `<a class="admin-tab${t.id === activeTab ? " is-active" : ""}" href="${adminTabHref(t.id)}">${esc(
+          t.label
+        )}</a>`
+    )
+    .join("")}</nav>`;
+}
+
+function adminListingsQueryHash(q, status, offset) {
+  const p = new URLSearchParams();
+  p.set("tab", "listings");
+  if (q) p.set("q", q);
+  if (status && status !== "all") p.set("status", status);
+  if (offset > 0) p.set("offset", String(offset));
+  return `#/admin?${p.toString()}`;
+}
+
+async function pageAdmin(query) {
+  const app = $("#app");
+  if (!getUser()) {
+    location.hash = "#/login";
+    return;
+  }
+  if (!isAdminUser()) {
+    document.title = "Доступ — AutoFinder";
+    app.innerHTML = `<section class="hero"><h1>Нет доступа</h1><p class="muted">Админ-панель доступна только администраторам.</p></section>`;
+    return;
+  }
+  const tabRaw = String(query.tab || "moderation").toLowerCase();
+  const tab = tabRaw === "users" || tabRaw === "listings" ? tabRaw : "moderation";
+  document.title = "Админ-панель — AutoFinder";
+
+  app.innerHTML = `
+    <div class="admin-shell">
+      <section class="hero admin-hero">
+        <h1>Админ-панель</h1>
+        <p class="muted">Модерация заявок, учётные записи и все объявления в одном месте.</p>
+      </section>
+      ${renderAdminTabs(tab)}
+      <div class="admin-panel card" id="admin-panel-root"><p class="loading">Загрузка…</p></div>
+    </div>`;
+
+  const root = $("#admin-panel-root");
+  if (!root) return;
+
+  if (tab === "moderation") {
+    let rows = [];
+    try {
+      rows = await api("/api/staff/pending-listings");
+    } catch (e) {
+      root.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+      return;
+    }
+    root.innerHTML = `
+      <p class="muted small" style="margin-top:0">Заявки в статусе «на проверке». Одобрение и отклонение — на странице проверки.</p>
+      <div class="staff-queue" style="margin-top:0.75rem">${staffPendingCardsInnerHtml(rows)}</div>`;
+    return;
+  }
+
+  if (tab === "users") {
+    const q = String(query.q || "").trim();
+    root.innerHTML = `
+      <form id="admin-users-search" class="admin-toolbar">
+        <input type="search" name="q" value="${esc(q)}" placeholder="Поиск по email, имени, телефону…" autocomplete="off" />
+        <button type="submit" class="button">Найти</button>
+        <a class="button ghost" href="${adminTabHref("users")}">Сбросить</a>
+      </form>
+      <p class="loading">Загрузка…</p>`;
+    $("#admin-users-search")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const qq = fd.get("q")?.toString().trim() || "";
+      location.hash = qq ? `#/admin?tab=users&q=${encodeURIComponent(qq)}` : "#/admin?tab=users";
+    });
+    const loadingEl = root.querySelector(".loading");
+    let rows = [];
+    try {
+      rows = await api(`/api/admin/users?limit=200${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+    } catch (e) {
+      if (loadingEl) loadingEl.remove();
+      root.insertAdjacentHTML("beforeend", `<p class="error">${esc(e.message)}</p>`);
+      return;
+    }
+    if (loadingEl) loadingEl.remove();
+    const roleRu = { user: "Пользователь", moderator: "Модератор", admin: "Админ" };
+    const table = `<div class="admin-table-wrap"><table class="data-table admin-table"><thead><tr>
+      <th>Email</th><th>Имя</th><th>Телефон</th><th>Роль</th><th>Объявл.</th><th>Статус</th><th></th>
+    </tr></thead><tbody>
+      ${rows
+        .map((u) => {
+          const blocked = Boolean(u.is_blocked);
+          return `<tr data-user-id="${esc(u.id)}">
+            <td>${esc(u.email)}</td>
+            <td>${esc(u.full_name || "—")}</td>
+            <td>${esc(u.phone || "—")}</td>
+            <td>${esc(roleRu[u.role] || u.role)}</td>
+            <td>${esc(String(u.listings_count ?? 0))}</td>
+            <td>${blocked ? '<span class="admin-badge admin-badge--warn">Заблокирован</span>' : "Активен"}</td>
+            <td class="admin-table__actions">
+              <button type="button" class="linkish admin-toggle-block" data-id="${esc(u.id)}" data-blocked="${blocked ? "1" : "0"}">${blocked ? "Разблокировать" : "Заблокировать"}</button>
+            </td>
+          </tr>`;
+        })
+        .join("")}
+    </tbody></table></div>
+    ${rows.length ? "" : '<p class="muted small">Пользователи не найдены.</p>'}`;
+    root.insertAdjacentHTML("beforeend", table);
+    root.querySelectorAll(".admin-toggle-block").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-id");
+        const cur = btn.getAttribute("data-blocked") === "1";
+        if (!id) return;
+        const next = !cur;
+        if (!confirm(next ? "Заблокировать пользователя?" : "Разблокировать пользователя?")) return;
+        try {
+          await api(`/api/admin/users/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ is_blocked: next }),
+          });
+          const qs = new URLSearchParams(location.hash.replace(/^#/, "").split("?")[1] || "");
+          await pageAdmin({ tab: "users", q: qs.get("q") || "" });
+        } catch (err) {
+          alert(err.message || "Ошибка");
+        }
+      });
+    });
+    return;
+  }
+
+  const q = String(query.q || "").trim();
+  const statusRaw = String(query.status || "all").toLowerCase();
+  const status = ["all", "draft", "published", "moderation", "archived"].includes(statusRaw) ? statusRaw : "all";
+  const offset = Math.max(0, Number(query.offset) || 0);
+  const limit = 40;
+
+  root.innerHTML = `
+    <form id="admin-listings-search" class="admin-toolbar admin-toolbar--wrap">
+      <input type="search" name="q" value="${esc(q)}" placeholder="ID, заголовок, марка, email владельца…" autocomplete="off" />
+      <label class="admin-select-label muted small">Статус
+        <select name="status">
+          <option value="all"${status === "all" ? " selected" : ""}>Все</option>
+          <option value="draft"${status === "draft" ? " selected" : ""}>Черновик</option>
+          <option value="published"${status === "published" ? " selected" : ""}>Опубликовано</option>
+          <option value="moderation"${status === "moderation" ? " selected" : ""}>На модерации</option>
+          <option value="archived"${status === "archived" ? " selected" : ""}>Архив</option>
+        </select>
+      </label>
+      <button type="submit" class="button">Найти</button>
+      <a class="button ghost" href="${adminTabHref("listings")}">Сбросить</a>
+    </form>
+    <p class="loading">Загрузка…</p>`;
+
+  $("#admin-listings-search")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const qq = fd.get("q")?.toString().trim() || "";
+    const st = fd.get("status")?.toString() || "all";
+    const p = new URLSearchParams();
+    p.set("tab", "listings");
+    if (qq) p.set("q", qq);
+    if (st && st !== "all") p.set("status", st);
+    location.hash = `#/admin?${p.toString()}`;
+  });
+
+  const loadingEl = root.querySelector(".loading");
+  let data;
+  try {
+    const qs = new URLSearchParams({ limit: String(limit), offset: String(offset), status });
+    if (q) qs.set("q", q);
+    data = await api(`/api/admin/listings?${qs.toString()}`);
+  } catch (e) {
+    if (loadingEl) loadingEl.remove();
+    root.insertAdjacentHTML("beforeend", `<p class="error">${esc(e.message)}</p>`);
+    return;
+  }
+  if (loadingEl) loadingEl.remove();
+  const items = data.items || [];
+  const total = Number(data.total) || 0;
+  const nextOffset = offset + items.length;
+
+  const pagerHtml =
+    offset > 0 || nextOffset < total
+      ? `<div class="admin-pager">
+          ${offset > 0 ? `<a class="button ghost" href="${esc(adminListingsQueryHash(q, status, Math.max(0, offset - limit)))}">← Назад</a>` : ""}
+          <span class="muted small">Показано ${offset + (items.length ? 1 : 0)}–${offset + items.length} из ${total}</span>
+          ${nextOffset < total ? `<a class="button ghost" href="${esc(adminListingsQueryHash(q, status, nextOffset))}">Далее →</a>` : ""}
+        </div>`
+      : total > 0
+        ? `<p class="muted small">Всего записей: ${total}</p>`
+        : "";
+
+  const table = `<div class="admin-table-wrap"><table class="data-table admin-table admin-table--listings"><thead><tr>
+      <th></th><th>Объявление</th><th>Владелец</th><th>Статус</th><th>Цена</th><th>Создано</th><th></th>
+    </tr></thead><tbody>
+      ${items
+        .map((row) => {
+          const img = firstImageUrl(row);
+          const stLabel = STATUS[row.status] || row.status || "—";
+          return `<tr>
+            <td class="admin-thumb-cell">${img ? imgTag(img, row.title, "admin-thumb") : '<span class="muted small">—</span>'}</td>
+            <td><strong>${esc(row.title || `${row.brand} ${row.model}`)}</strong><div class="muted small">${esc(row.brand)} ${esc(row.model)} · ${esc(String(row.year || "—"))}</div></td>
+            <td class="muted small">${esc(row.owner_email || "—")}</td>
+            <td>${esc(stLabel)}</td>
+            <td>${esc(fmtByn(row.price_byn))}</td>
+            <td class="muted small">${esc(fmtDt(row.created_at))}</td>
+            <td><a class="button ghost" href="#/listings/${esc(row.id)}">На сайте</a></td>
+          </tr>`;
+        })
+        .join("")}
+    </tbody></table></div>`;
+
+  root.insertAdjacentHTML(
+    "beforeend",
+    `${items.length ? table : '<p class="muted small">Ничего не найдено.</p>'}${pagerHtml}`
+  );
 }
 
 function isStaffUser() {
@@ -1194,22 +1418,7 @@ async function pageStaff() {
     app.innerHTML = `<section class="hero"><h1>Ошибка</h1><p class="error">${esc(e.message)}</p><p><a href="#/home">Главная</a></p></section>`;
     return;
   }
-  const list = rows.length
-    ? rows
-        .map((row) => {
-          const img = firstImageUrl(row);
-          return `<article class="staff-card">
-            <div>${img ? imgTag(img, row.title, "profile-listing-card__img") : `<div class="placeholder">Нет фото</div>`}</div>
-            <div class="staff-card__meta">
-              <strong><a href="#/staff/${esc(row.id)}">${esc(row.title)}</a></strong>
-              <div class="muted small">${esc(row.brand)} ${esc(row.model)} · ${esc(String(row.year || ""))}</div>
-              <div class="muted small">${esc(row.owner_email || "")}</div>
-            </div>
-            <a class="button" href="#/staff/${esc(row.id)}">Проверить</a>
-          </article>`;
-        })
-        .join("")
-    : '<p class="empty">Нет заявок на модерации.</p>';
+  const list = staffPendingCardsInnerHtml(rows);
   app.innerHTML = `
     <section class="hero"><h1>Модерация</h1><p class="muted">Заявки в статусе «на проверке». Одобрение и отклонение — как в приложении.</p></section>
     <div class="staff-queue">${list}</div>
@@ -1449,12 +1658,13 @@ async function pageProfile() {
       <a class="card profile-shortcut" href="#/favorites"><strong>Избранное</strong><span class="muted small">Сохранённые объявления</span></a>
       <a class="card profile-shortcut" href="#/compare"><strong>Сравнение</strong><span class="muted small">До ${CMP_MAX} авто</span></a>
       <a class="card profile-shortcut" href="#/messages"><strong>Сообщения</strong><span class="muted small">Переписка с покупателями</span></a>
-      <a class="card profile-shortcut" href="#/platforms"><strong>Площадки</strong><span class="muted small">Источники ленты</span></a>
       <a class="card profile-shortcut" href="#/settings"><strong>Тема сайта</strong><span class="muted small">Только в браузере</span></a>
       ${
-        me.role === "moderator" || me.role === "admin"
-          ? `<a class="card profile-shortcut" href="#/staff"><strong>Модерация</strong><span class="muted small">Заявки на публикацию</span></a>`
-          : ""
+        me.role === "admin"
+          ? `<a class="card profile-shortcut" href="#/admin"><strong>Админ-панель</strong><span class="muted small">Модерация, пользователи, объявления</span></a>`
+          : me.role === "moderator"
+            ? `<a class="card profile-shortcut" href="#/staff"><strong>Модерация</strong><span class="muted small">Заявки на публикацию</span></a>`
+            : ""
       }
     </div>
     <section class="card narrow-profile profile-form">
@@ -1574,8 +1784,8 @@ async function router() {
       case "feed":
         await pageFeed(route.id);
         break;
-      case "platforms":
-        await pagePlatforms();
+      case "admin":
+        await pageAdmin(route.query);
         break;
       case "settings":
         pageSettings();

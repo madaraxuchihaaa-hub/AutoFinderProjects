@@ -1,0 +1,7 @@
+# Railway / Nixpacks: явная установка без устаревшего флага production (см. npm warn config production).
+# Если в проекте Root Directory = server, положите копию этого файла в server/ или задайте в Railway Variables: NPM_CONFIG_PRODUCTION=false
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]

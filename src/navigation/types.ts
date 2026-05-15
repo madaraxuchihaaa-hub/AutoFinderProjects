@@ -17,7 +17,6 @@ export type RootStackParamList = {
   VehicleDetail: { scope: "aggregated" | "listing"; id: string };
   CreateListing: { listingId?: string } | undefined;
   StaffReviewListing: { id: string };
-  Platforms: undefined;
   Settings: undefined;
   ChatDetail: {
     conversationId: string;

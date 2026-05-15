@@ -1,0 +1,6 @@
+# Для деплоя с Root Directory = server (только папка server в контейнере)
+[variables]
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.install]
+cmds = ["npm ci --omit=dev"]

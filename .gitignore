@@ -9,6 +9,10 @@ web-build/
 server/.env
 server/uploads/
 uploads/
+
+# Локальные тестовые фото (структуру каталога коммитим)
+server/test-data/photos/*
+!server/test-data/photos/.gitkeep
 .DS_Store
 
 # Android SDK path (создайте из local.properties)

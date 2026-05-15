@@ -7,7 +7,7 @@
   "scripts": {
     "start": "expo start",
     "start:railway": "npm start --prefix server",
-    "postinstall": "npm ci --prefix server",
+    "postinstall": "npm ci --prefix server --omit=dev",
     "sync:catalog": "node server/scripts/sync-car-catalog-to-app.mjs",
     "docker:up": "docker compose up --build",
     "docker:down": "docker compose down",

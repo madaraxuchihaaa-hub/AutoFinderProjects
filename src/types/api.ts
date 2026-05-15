@@ -93,14 +93,6 @@ export type StatsResponse = {
   queuePending: number;
 };
 
-export type PlatformRow = {
-  id: number;
-  code: string;
-  name: string;
-  base_url: string | null;
-  is_active: boolean;
-};
-
 export type QueueJobRow = {
   id: string;
   status: string;
