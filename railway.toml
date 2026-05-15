@@ -3,7 +3,8 @@
 # Переменные в Railway → Variables:
 #   JWT_SECRET      — случайная строка 32+ символов
 #   DATABASE_URL    — PostgreSQL (или PGHOST/PGUSER/…)
-#   PUBLIC_BASE_URL — https://<ваш-домен> (обязательно https, иначе фото не грузятся)
+#   DISABLE_STATIC_CACHE=1 — (устарело) кэш статики по умолчанию отключён для HTML/JS/CSS
+#   WEB_STATIC_LONG_CACHE=1 — включить max-age 1h для статики (только если нужен CDN-кэш)
 #   Фото: по умолчанию папка server/uploads (рядом с кодом). Том Railway смонтируйте на этот путь,
 #   например mount path = server/uploads (или задайте UPLOAD_DIR и смонтируйте туда же).
 #
