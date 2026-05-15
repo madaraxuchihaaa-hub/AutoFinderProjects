@@ -14,9 +14,13 @@ import type { ThemeColors } from "../theme/colors";
 import { fonts, radii, spacing } from "../theme";
 import {
   isValidBrandModel,
+  mergeCatalogNames,
   searchBrandsLocal,
   searchModelsLocal,
 } from "../utils/vehicleCatalog";
+
+const BRAND_LIMIT = 50;
+const MODEL_LIMIT = 50;
 
 type BrandRow = { id: number; name: string };
 type ModelRow = { id: number; name: string; brand_name: string };
@@ -54,33 +58,29 @@ export default function VehicleAutocomplete({
       setLoading(true);
       try {
         if (kind === "brand") {
-          let names: string[] = [];
+          const local = searchBrandsLocal(q, BRAND_LIMIT);
+          let api: string[] = [];
           try {
             const rows = await apiGet<BrandRow[]>(
-              `/api/vehicles/brands?q=${encodeURIComponent(q)}&limit=30`
+              `/api/vehicles/brands?q=${encodeURIComponent(q)}&limit=${BRAND_LIMIT}`
             );
-            names = rows.map((r) => r.name);
+            api = rows.map((r) => r.name);
           } catch {
-            names = [];
+            api = [];
           }
-          if (names.length === 0) {
-            names = searchBrandsLocal(q, 30);
-          }
-          setItems(names);
+          setItems(mergeCatalogNames(local, api, BRAND_LIMIT));
         } else {
-          let names: string[] = [];
+          const local = searchModelsLocal(brand!, q, MODEL_LIMIT);
+          let api: string[] = [];
           try {
             const rows = await apiGet<ModelRow[]>(
-              `/api/vehicles/models?brand=${encodeURIComponent(brand!)}&q=${encodeURIComponent(q)}&limit=40`
+              `/api/vehicles/models?brand=${encodeURIComponent(brand!)}&q=${encodeURIComponent(q)}&limit=${MODEL_LIMIT}`
             );
-            names = rows.map((r) => r.name);
+            api = rows.map((r) => r.name);
           } catch {
-            names = [];
+            api = [];
           }
-          if (names.length === 0) {
-            names = searchModelsLocal(brand!, q, 40);
-          }
-          setItems(names);
+          setItems(mergeCatalogNames(local, api, MODEL_LIMIT));
         }
       } finally {
         setLoading(false);

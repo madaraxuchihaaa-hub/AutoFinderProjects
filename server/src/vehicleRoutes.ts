@@ -1,11 +1,23 @@
 import type { Express } from "express";
 import type { Pool } from "pg";
-import { isValidBrandModelLocal } from "./carCatalogLocal.js";
+import { isValidBrandModelLocal, searchBrandsLocal, searchModelsLocal } from "./carCatalogLocal.js";
+
+function mergeNames(local: string[], api: string[], limit: number): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of [...local, ...api]) {
+    if (seen.has(n)) continue;
+    seen.add(n);
+    out.push(n);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 
 export function registerVehicleRoutes(app: Express, pool: Pool): void {
   app.get("/api/vehicles/brands", async (req, res) => {
     const q = String(req.query.q ?? "").trim();
-    const limit = Math.min(Number(req.query.limit) || 25, 50);
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
     const { rows } = await pool.query<{ id: number; name: string }>(
       q
         ? `SELECT id, name FROM vehicle_brands
@@ -15,13 +27,16 @@ export function registerVehicleRoutes(app: Express, pool: Pool): void {
         : `SELECT id, name FROM vehicle_brands ORDER BY name LIMIT $1`,
       q ? [`%${q}%`, limit] : [limit]
     );
-    res.json(rows);
+    const apiNames = rows.map((r) => r.name);
+    const localNames = searchBrandsLocal(q, limit);
+    const names = mergeNames(localNames, apiNames, limit);
+    res.json(names.map((name, i) => ({ id: i + 1, name })));
   });
 
   app.get("/api/vehicles/models", async (req, res) => {
     const brand = String(req.query.brand ?? "").trim();
     const q = String(req.query.q ?? "").trim();
-    const limit = Math.min(Number(req.query.limit) || 30, 60);
+    const limit = Math.min(Number(req.query.limit) || 50, 80);
     if (!brand) {
       res.status(400).json({ error: "validation", message: "Укажите марку (brand)." });
       return;
@@ -42,7 +57,12 @@ export function registerVehicleRoutes(app: Express, pool: Pool): void {
            LIMIT $2`,
       q ? [brand, `%${q}%`, limit] : [brand, limit]
     );
-    res.json(rows);
+    const apiNames = rows.map((r) => r.name);
+    const localNames = searchModelsLocal(brand, q, limit);
+    const names = mergeNames(localNames, apiNames, limit);
+    res.json(
+      names.map((name, i) => ({ id: i + 1, name, brand_name: brand }))
+    );
   });
 }
 

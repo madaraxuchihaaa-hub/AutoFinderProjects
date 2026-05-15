@@ -113,9 +113,9 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>Действия</Text>
         <View style={styles.actions}>
           <ActionRow
-            icon="globe-outline"
-            title="Рынок"
-            onPress={() => navigation.navigate("Market")}
+            icon="newspaper-outline"
+            title="Объявления"
+            onPress={() => navigation.navigate("Listings")}
           />
           <ActionRow
             icon="car-sport"

@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useMemo } from "react";
 import { Pressable, StyleSheet } from "react-native";
 import { usePreferences } from "../preferences/PreferencesContext";
-import AggregatedScreen from "../screens/AggregatedScreen";
+import ListingsScreen from "../screens/ListingsScreen";
 import CatalogScreen from "../screens/CatalogScreen";
 import HomeScreen from "../screens/HomeScreen";
 import ChatsScreen from "../screens/ChatsScreen";
@@ -48,7 +48,7 @@ export default function MainTabs() {
         component={HomeScreen}
         options={{ title: "Главная", headerShown: false }}
       />
-      <Tab.Screen name="Market" component={AggregatedScreen} options={{ title: "Рынок" }} />
+      <Tab.Screen name="Listings" component={ListingsScreen} options={{ title: "Объявления" }} />
       <Tab.Screen
         name="Chats"
         component={ChatsScreen}

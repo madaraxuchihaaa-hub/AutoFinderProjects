@@ -44,6 +44,7 @@ for (const key of Object.keys(main.brands).sort((a, b) => a.localeCompare(b, "ru
 const json = `${JSON.stringify(sorted, null, 2)}\n`;
 fs.writeFileSync(mainPath, json);
 fs.writeFileSync(clientPath, json);
+console.log("Run: npm run sync:catalog (root) if you only edited car_data.json");
 
 const counts = Object.entries(sorted.brands).map(([k, v]) => [k, v.length]);
 console.log("Brands:", counts.length);

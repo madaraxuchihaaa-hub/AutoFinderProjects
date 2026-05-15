@@ -35,10 +35,10 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
           colors={colors}
         />
         <TabBtn
-          active={activeRoute === "Market"}
-          label={t("tabMarket")}
-          icon="globe-outline"
-          onPress={() => go("Market")}
+          active={activeRoute === "Listings"}
+          label={t("tabListings")}
+          icon="newspaper-outline"
+          onPress={() => go("Listings")}
           colors={colors}
         />
         <TabBtn

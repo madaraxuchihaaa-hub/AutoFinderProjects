@@ -3,7 +3,7 @@ export type Locale = "ru" | "en";
 const dict = {
   ru: {
     tabHome: "Главная",
-    tabMarket: "Рынок",
+    tabListings: "Объявления",
     tabChats: "Чаты",
     tabMenu: "Меню",
     menuGarage: "Гараж",
@@ -27,7 +27,7 @@ const dict = {
   },
   en: {
     tabHome: "Home",
-    tabMarket: "Market",
+    tabListings: "Listings",
     tabChats: "Chats",
     tabMenu: "Menu",
     menuGarage: "Garage",

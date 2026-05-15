@@ -4,11 +4,22 @@ import type { Pool } from "pg";
 
 type CarDataFile = { brands: Record<string, string[]> };
 
-export async function seedCarCatalogIfNeeded(pool: Pool): Promise<void> {
-  const { rows } = await pool.query<{ c: string }>(
-    "SELECT COUNT(*)::text AS c FROM vehicle_brands"
-  );
-  if (Number(rows[0].c) > 0) return;
+/** Загрузить каталог из data/car_data.json в PostgreSQL. */
+export async function syncCarCatalogFromFile(
+  pool: Pool,
+  options?: { force?: boolean }
+): Promise<void> {
+  const force = options?.force === true || process.env.CATALOG_FORCE_RESEED === "1";
+
+  if (!force) {
+    const { rows } = await pool.query<{ c: string }>(
+      "SELECT COUNT(*)::text AS c FROM vehicle_brands"
+    );
+    if (Number(rows[0].c) > 0) return;
+  } else {
+    await pool.query("TRUNCATE vehicle_models, vehicle_brands RESTART IDENTITY CASCADE");
+    console.info("[seed] vehicle catalog: force reseed from car_data.json");
+  }
 
   const filePath = path.join(process.cwd(), "data", "car_data.json");
   if (!fs.existsSync(filePath)) {
@@ -55,4 +66,8 @@ export async function seedCarCatalogIfNeeded(pool: Pool): Promise<void> {
   } finally {
     client.release();
   }
+}
+
+export async function seedCarCatalogIfNeeded(pool: Pool): Promise<void> {
+  await syncCarCatalogFromFile(pool, { force: false });
 }

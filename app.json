@@ -6,9 +6,11 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "scheme": "autofinder",
+    "icon": "./assets/icon.png",
     "splash": {
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0B0F14"
+      "backgroundColor": "#B8B8B8"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -20,13 +22,18 @@
     "android": {
       "package": "com.autofinder.app",
       "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#B8B8B8"
+      },
       "navigationBar": {
         "backgroundColor": "#0E141C"
       }
     },
     "web": {
       "bundler": "metro",
-      "output": "single"
+      "output": "single",
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-font",

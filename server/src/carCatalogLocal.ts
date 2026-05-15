@@ -18,6 +18,21 @@ function loadBrands(): Record<string, string[]> {
   return brandsCache;
 }
 
+export function searchBrandsLocal(query: string, limit = 50): string[] {
+  const names = Object.keys(loadBrands());
+  const q = query.trim().toLowerCase();
+  const list = q ? names.filter((n) => n.toLowerCase().includes(q)) : names;
+  return list.sort((a, b) => a.localeCompare(b, "ru")).slice(0, limit);
+}
+
+export function searchModelsLocal(brand: string, query: string, limit = 50): string[] {
+  const models = loadBrands()[brand.trim()];
+  if (!models) return [];
+  const q = query.trim().toLowerCase();
+  const list = q ? models.filter((m) => m.toLowerCase().includes(q)) : models;
+  return list.sort((a, b) => a.localeCompare(b, "ru")).slice(0, limit);
+}
+
 export function isValidBrandModelLocal(brand: string, model: string): boolean {
   const models = loadBrands()[brand.trim()];
   if (!models) return false;

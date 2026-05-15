@@ -9,6 +9,7 @@ import { registerProtectedListingRoutes } from "./listingsHandlers.js";
 import { registerAdminUserRoutes } from "./adminUserRoutes.js";
 import { registerChatRoutes } from "./chatRoutes.js";
 import { getUsdPerByn, bynToUsd } from "./exchangeRates.js";
+import { parseListingSearchQuery, searchPublishedListings } from "./listingSearch.js";
 import { registerStaffRoutes } from "./staffRoutes.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
@@ -107,21 +108,35 @@ app.get("/api/aggregated/:id", async (req, res) => {
 });
 
 app.get("/api/listings", async (req, res) => {
-  const limit = Math.min(Number(req.query.limit) || 30, 100);
-  const { rows } = await pool.query(
-    `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_byn, l.city, l.status, l.created_at,
-            COALESCE(
-              (SELECT json_agg(url ORDER BY sort_order)
-               FROM listing_images li WHERE li.listing_id = l.id),
-              '[]'::json
-            ) AS images
-     FROM listings l
-     WHERE l.status = 'published'
-     ORDER BY l.created_at DESC
-     LIMIT $1`,
-    [limit]
-  );
-  res.json(rows);
+  const params = parseListingSearchQuery(req.query as Record<string, unknown>);
+  const hasFilters =
+    params.brand ||
+    params.model ||
+    params.yearFrom != null ||
+    params.yearTo != null ||
+    params.priceFrom != null ||
+    params.priceTo != null ||
+    params.volumeFrom != null ||
+    params.volumeTo != null ||
+    params.transmission ||
+    params.bodyType ||
+    params.fuelType ||
+    params.drivetrain ||
+    params.generation ||
+    params.q;
+
+  if (hasFilters || req.query.search === "1") {
+    const { rows, total } = await searchPublishedListings(pool, {
+      ...params,
+      limit: params.limit ?? 50,
+    });
+    res.json({ items: rows, total });
+    return;
+  }
+
+  const limit = Math.min(Number(req.query.limit) || 50, 100);
+  const { rows, total } = await searchPublishedListings(pool, { limit });
+  res.json({ items: rows, total });
 });
 
 app.get("/api/listings/:id", optionalAuth, async (req, res) => {
