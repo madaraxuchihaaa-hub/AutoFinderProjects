@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CommonActions } from "@react-navigation/native";
+import EquipmentDisplay, { type EquipmentSection } from "../components/EquipmentDisplay";
 import { apiGet, apiPost, resolveMediaUrl } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useSavedListings } from "../hooks/useSavedListings";
@@ -58,6 +59,8 @@ type ListingDetail = {
   interior?: string | null;
   interior_details?: string | null;
   safety_systems?: string | null;
+  equipment?: Record<string, string[]>;
+  equipment_sections?: EquipmentSection[];
   plate_number?: string | null;
   city: string | null;
   status: string;
@@ -67,6 +70,51 @@ type ListingDetail = {
   owner_name?: string | null;
   owner_phone?: string | null;
 };
+
+function splitList(s: string | null | undefined): string[] {
+  if (!s) return [];
+  return s
+    .split(/[,;•\n]+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+}
+
+function buildEquipmentSectionsFallback(listing: ListingDetail): EquipmentSection[] {
+  const sections: EquipmentSection[] = [];
+  if (listing.trim_level) {
+    sections.push({ id: "trim", label: "Комплектация", values: [listing.trim_level] });
+  }
+  if (listing.equipment && typeof listing.equipment === "object") {
+    const labels: Record<string, string> = {
+      interior: "Салон",
+      safety: "Системы безопасности",
+      assistance: "Системы помощи",
+      exterior: "Экстерьер",
+      optics: "Оптика и свет",
+      climate: "Климат",
+      multimedia: "Мультимедиа",
+      comfort: "Комфорт",
+    };
+    for (const [id, values] of Object.entries(listing.equipment)) {
+      if (Array.isArray(values) && values.length) {
+        sections.push({ id, label: labels[id] ?? id, values });
+      }
+    }
+  }
+  const interior = splitList(listing.interior);
+  if (interior.length && !sections.some((s) => s.id === "interior")) {
+    sections.push({ id: "interior", label: "Салон", values: interior });
+  }
+  const safety = splitList(listing.safety_systems);
+  if (safety.length && !sections.some((s) => s.id === "safety")) {
+    sections.push({ id: "safety", label: "Системы безопасности", values: safety });
+  }
+  const misc = splitList(listing.interior_details);
+  if (misc.length) {
+    sections.push({ id: "misc", label: "Опции", values: misc });
+  }
+  return sections;
+}
 
 function listingStatusLabel(status: string): string {
   if (status === "moderation") return "На проверке";
@@ -264,18 +312,17 @@ export default function VehicleDetailScreen({ route, navigation }: Props) {
           </View>
         )}
 
+        <EquipmentDisplay
+          sections={
+            listing.equipment_sections?.length
+              ? listing.equipment_sections
+              : buildEquipmentSectionsFallback(listing)
+          }
+        />
         <View style={styles.grid}>
           <Spec k="Марка / модель" v={`${listing.brand} ${listing.model}`} />
           <Spec k="Год" v={String(listing.year)} />
           <Spec k="Пробег" v={formatKm(listing.mileage_km)} />
-          <Spec k="Комплектация" v={listing.trim_level ?? "—"} />
-          <Spec k="Салон" v={listing.interior ?? "—"} />
-          {listing.interior_details ? (
-            <Spec k="Характеристики салона" v={listing.interior_details} />
-          ) : null}
-          {listing.safety_systems ? (
-            <Spec k="Системы безопасности" v={listing.safety_systems} />
-          ) : null}
           {listing.plate_number ? <Spec k="Госномер" v={listing.plate_number} /> : null}
           <Spec k="Топливо" v={listing.fuel_type ?? "—"} />
           <Spec k="КПП" v={listing.transmission ?? "—"} />

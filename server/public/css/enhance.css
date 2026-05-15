@@ -145,3 +145,123 @@ body {
   margin: 0;
   font-weight: 500;
 }
+
+.ls-av__equipment-toggle {
+  margin-top: 0.85rem;
+  font-size: 0.9rem;
+  color: var(--accent);
+}
+
+.eq-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.1rem;
+  margin: 0;
+}
+
+.eq-block legend {
+  font-weight: 700;
+  padding: 0 0.35rem;
+}
+
+.eq-field {
+  margin-bottom: 0.65rem;
+}
+
+.eq-field__label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.eq-field__select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #121820;
+  color: var(--text);
+}
+
+.eq-field__toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #151c26;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.eq-field__toggle:hover {
+  border-color: rgba(61, 139, 253, 0.45);
+}
+
+.eq-field__count {
+  min-width: 1.4rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.eq-field__panel {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #0f1419;
+}
+
+.eq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.eq-chip {
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #1a222d;
+  color: var(--text);
+  padding: 0.28rem 0.65rem;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.eq-chip.is-on {
+  border-color: rgba(61, 139, 253, 0.55);
+  background: rgba(61, 139, 253, 0.18);
+  color: #e8eef5;
+}
+
+.create-listing label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+}
+
+.create-listing input,
+.create-listing textarea,
+.create-listing select {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #121820;
+  color: var(--text);
+  font: inherit;
+}
+
+.checkbox-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.5rem !important;
+}

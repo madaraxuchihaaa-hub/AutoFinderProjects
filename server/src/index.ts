@@ -12,6 +12,7 @@ import { getUsdPerByn, bynToUsd } from "./exchangeRates.js";
 import { parseListingSearchQuery, searchPublishedListings } from "./listingSearch.js";
 import { registerStaffRoutes } from "./staffRoutes.js";
 import { registerSavedListingRoutes } from "./savedListingRoutes.js";
+import { getEquipmentCatalog, resolveListingEquipment } from "./equipmentOptions.js";
 import { getPublicOrigin, withNormalizedImages, withNormalizedImagesList } from "./mediaUrls.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
@@ -180,7 +181,17 @@ app.get("/api/listings/:id", optionalAuth, async (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
-  res.json(withNormalizedImages(rows[0], getPublicOrigin(req)));
+  const row = withNormalizedImages(rows[0], getPublicOrigin(req));
+  const resolved = resolveListingEquipment(row);
+  res.json({
+    ...row,
+    equipment: resolved.equipment,
+    equipment_sections: resolved.sections,
+  });
+});
+
+app.get("/api/catalog/equipment-options", (_req, res) => {
+  res.json(getEquipmentCatalog());
 });
 
 app.get("/api/queue/summary", async (_req, res) => {

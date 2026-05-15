@@ -17,6 +17,14 @@ import {
   parseImagesField,
   resolveMediaUrl,
 } from "./media.js";
+import {
+  collectEquipmentFromForm,
+  equipmentDisplayHtml,
+  initEquipmentToggle,
+  loadEquipmentCatalog,
+  parseListingEquipment,
+  renderEquipmentPickers,
+} from "./equipment.js";
 
 const TOKEN_KEY = "af_token";
 const USER_KEY = "af_user";
@@ -117,15 +125,7 @@ function listingSpecRows(item) {
         ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км`
         : "—",
     ],
-    ["Комплектация", item.trim_level || "—"],
-    ["Салон", item.interior || "—"],
   ];
-  if (item.interior_details) {
-    rows.push(["Характеристики салона", item.interior_details]);
-  }
-  if (item.safety_systems) {
-    rows.push(["Системы безопасности", item.safety_systems]);
-  }
   if (item.plate_number) {
     rows.push(["Госномер", item.plate_number]);
   }
@@ -175,6 +175,7 @@ function parseRoute() {
   if (parts[0] === "profile") return { page: "profile", query };
   if (parts[0] === "favorites") return { page: "favorites", query };
   if (parts[0] === "my-listings") return { page: "my-listings", query };
+  if (parts[0] === "create") return { page: "create-listing", query };
   return { page: "listings", query };
 }
 
@@ -196,9 +197,9 @@ function renderNav() {
     html += `
       <a href="${navHref("/profile")}">Профиль</a>
       <a href="${navHref("/my-listings")}">Мои объявления</a>
+      <a class="nav-cta" href="#/create">Подать объявление</a>
       <a href="${navHref("/favorites")}">Избранное</a>
       <a href="${navHref("/messages")}">Сообщения</a>
-      <a href="${navHref("/help")}" class="nav-cta">Разместить</a>
     `;
     if (user.role === "moderator" || user.role === "admin") {
       html += `<a href="${navHref("/help")}" title="Модерация в мобильном приложении">Модерация</a>`;
@@ -585,6 +586,9 @@ async function pageListing(id) {
   document.title = "Объявление — AutoFinder";
   app.innerHTML = `<p class="loading">Загрузка…</p>`;
   const item = await api(`/api/listings/${encodeURIComponent(id)}`);
+  await loadEquipmentCatalog(api);
+  const eqSections = parseListingEquipment(item);
+  const equipmentHtml = equipmentDisplayHtml(eqSections, esc);
   const user = getUser();
   const imgs = parseImagesField(item.images)
     .map((p) => resolveMediaUrl(p))
@@ -659,6 +663,7 @@ async function pageListing(id) {
           <div class="ls-av__phone muted small" id="listing-phone-reveal" hidden></div>
         </aside>
       </div>
+      ${equipmentHtml}
       <div class="ls-av__panels ls-av__panels--specs">
         <section class="ls-av__panel ls-av__panel--wide">
           <h2 class="ls-av__panel-title">Характеристики</h2>
@@ -705,6 +710,94 @@ async function pageListing(id) {
     </div>
   `;
   initListingDetail(app);
+  initEquipmentToggle(app);
+}
+
+async function pageCreateListing() {
+  const user = getUser();
+  if (!user) {
+    location.hash = "#/login";
+    return;
+  }
+  const catalog = await loadEquipmentCatalog(api);
+  const app = $("#app");
+  document.title = "Новое объявление — AutoFinder";
+  app.innerHTML = `
+    <section class="hero hero-catalog card">
+      <div class="hero-catalog__main">
+        <p class="hero-kicker">Продажа</p>
+        <h1>Подать объявление</h1>
+        <p class="muted">Заполните данные и выберите комплектацию из списка.</p>
+      </div>
+    </section>
+    <form class="card stack create-listing" id="create-listing-form">
+      <p class="error hidden" id="create-err"></p>
+      <label>Заголовок<input name="title" required maxlength="200" placeholder="BMW 320i, один владелец" /></label>
+      <div class="filter-grid">
+        <label>Марка<input name="brand" required placeholder="BMW" list="brand-list" /></label>
+        <label>Модель<input name="model" required placeholder="320i" /></label>
+        <label>Год<input name="year" type="number" required min="1990" max="2030" /></label>
+        <label>Цена, BYN<input name="price_byn" type="number" required min="1" /></label>
+        <label>Пробег, км<input name="mileage_km" type="number" min="0" /></label>
+        <label>Город<input name="city" placeholder="Минск" /></label>
+        <label>Топливо<select name="fuel_type"><option value="">—</option>${Object.entries(FUEL).map(([k,v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
+        <label>КПП<select name="transmission"><option value="">—</option>${Object.entries(TRANS).map(([k,v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
+        <label>Кузов<select name="body_type"><option value="">—</option>${Object.entries(BODY).map(([k,v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
+        <label>Госномер<input name="plate_number" placeholder="1234 AB-7" /></label>
+      </div>
+      <fieldset class="eq-block">
+        <legend>Комплектация и опции</legend>
+        <div id="equipment-pickers"></div>
+      </fieldset>
+      <label>Описание<textarea name="description" rows="4" maxlength="4000" placeholder="История, состояние…"></textarea></label>
+      <label class="checkbox-row"><input type="checkbox" name="show_phone" checked /> Показывать телефон в объявлении</label>
+      <label>Фото (URL, по одному в строке)<textarea name="image_urls" rows="3" placeholder="https://… или загрузите в приложении"></textarea></label>
+      <p class="muted small">Для загрузки с телефона используйте мобильное приложение — ссылки добавятся автоматически.</p>
+      <button type="submit" class="button">Отправить на модерацию</button>
+    </form>
+  `;
+  const pickers = $("#equipment-pickers");
+  if (pickers) renderEquipmentPickers(pickers, catalog, esc);
+  $("#create-listing-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("#create-err");
+    const fd = new FormData(e.target);
+    const eq = collectEquipmentFromForm(pickers);
+    const image_urls = String(fd.get("image_urls") || "")
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    try {
+      await api("/api/listings", {
+        method: "POST",
+        body: JSON.stringify({
+          title: String(fd.get("title") || "").trim(),
+          brand: String(fd.get("brand") || "").trim(),
+          model: String(fd.get("model") || "").trim(),
+          year: Number(fd.get("year")),
+          price_byn: Number(fd.get("price_byn")),
+          mileage_km: fd.get("mileage_km") ? Number(fd.get("mileage_km")) : undefined,
+          city: String(fd.get("city") || "").trim() || undefined,
+          fuel_type: String(fd.get("fuel_type") || "") || undefined,
+          transmission: String(fd.get("transmission") || "") || undefined,
+          body_type: String(fd.get("body_type") || "") || undefined,
+          plate_number: String(fd.get("plate_number") || "").trim() || undefined,
+          description: String(fd.get("description") || "").trim() || undefined,
+          show_phone: fd.get("show_phone") === "on",
+          trim_level: eq.trim_level,
+          equipment: eq.equipment,
+          image_urls,
+        }),
+      });
+      location.hash = "#/my-listings";
+    } catch (ex) {
+      if (err) {
+        err.textContent = ex.message || "Не удалось сохранить";
+        err.classList.remove("hidden");
+      }
+    }
+  });
 }
 
 async function pageLogin() {
@@ -1048,6 +1141,9 @@ async function router() {
         break;
       case "my-listings":
         await pageMyListings();
+        break;
+      case "create-listing":
+        await pageCreateListing();
         break;
       default:
         await pageListings(route.query);

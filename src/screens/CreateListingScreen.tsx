@@ -19,6 +19,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../auth/AuthContext";
 import VehicleAutocomplete, { validateBrandModelChoice } from "../components/VehicleAutocomplete";
+import EquipmentPickers, { type EquipmentMap } from "../components/EquipmentPickers";
 import { apiPost, apiUploadImages } from "../api/client";
 import type { RootStackParamList } from "../navigation/types";
 import type { CreateListingResponse } from "../types/api";
@@ -43,9 +44,7 @@ export default function CreateListingScreen({ navigation }: Props) {
   const [transmission, setTransmission] = useState("");
   const [body, setBody] = useState("");
   const [trimLevel, setTrimLevel] = useState("");
-  const [interior, setInterior] = useState("");
-  const [interiorDetails, setInteriorDetails] = useState("");
-  const [safetySystems, setSafetySystems] = useState("");
+  const [equipment, setEquipment] = useState<EquipmentMap>({});
   const [plateNumber, setPlateNumber] = useState("");
   const [showPhone, setShowPhone] = useState(true);
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
@@ -133,9 +132,7 @@ export default function CreateListingScreen({ navigation }: Props) {
         transmission: transmission.trim() || undefined,
         body_type: body.trim() || undefined,
         trim_level: trimLevel.trim() || undefined,
-        interior: interior.trim() || undefined,
-        interior_details: interiorDetails.trim() || undefined,
-        safety_systems: safetySystems.trim() || undefined,
+        equipment,
         plate_number: plateNumber.trim() || undefined,
         show_phone: showPhone,
         image_urls,
@@ -206,21 +203,11 @@ export default function CreateListingScreen({ navigation }: Props) {
         </Row>
         <Field label="Госномер (необязательно)" value={plateNumber} onChangeText={setPlateNumber} ph="1234 AB-7" />
         <Text style={styles.fieldHint}>{BY_PLATE_HINT}</Text>
-        <Field label="Комплектация" value={trimLevel} onChangeText={setTrimLevel} ph="Comfort, M Sport…" />
-        <Field label="Салон" value={interior} onChangeText={setInterior} ph="Кожа, ткань, комбинированный…" />
-        <Field
-          label="Характеристики салона"
-          value={interiorDetails}
-          onChangeText={setInteriorDetails}
-          ph="Подогрев сидений, электрорегулировка, климат…"
-          multiline
-        />
-        <Field
-          label="Системы безопасности"
-          value={safetySystems}
-          onChangeText={setSafetySystems}
-          ph={"ABS, ESP, Isofix, антипробуксовочная,\nблокировка задних дверей, TPMS,\nэкстренное торможение, подушки…"}
-          multiline
+        <EquipmentPickers
+          trimLevel={trimLevel}
+          onTrimChange={setTrimLevel}
+          equipment={equipment}
+          onEquipmentChange={setEquipment}
         />
         <Field label="Описание" value={description} onChangeText={setDescription} ph="История, состояние…" multiline />
         <Row>

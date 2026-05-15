@@ -3,6 +3,10 @@ import type { Pool } from "pg";
 import { enqueuePublicationQueue } from "./listingQueue.js";
 import { validateBrandModel } from "./vehicleRoutes.js";
 import { validateByPhone, validateByPlate, normalizeByPlate } from "./validation/by.js";
+import {
+  equipmentFromBody,
+  sanitizeEquipmentForDb,
+} from "./equipmentOptions.js";
 import { getPublicOrigin, withNormalizedImagesList } from "./mediaUrls.js";
 
 function parsePriceByn(b: Record<string, unknown>): number {
@@ -55,10 +59,12 @@ export function registerProtectedListingRoutes(
     const fuel_type = b.fuel_type ? String(b.fuel_type).trim() : null;
     const transmission = b.transmission ? String(b.transmission).trim() : null;
     const body_type = b.body_type ? String(b.body_type).trim() : null;
-    const trim_level = b.trim_level ? String(b.trim_level).trim() : null;
-    const interior = b.interior ? String(b.interior).trim() : null;
-    const interior_details = b.interior_details ? String(b.interior_details).trim() : null;
-    const safety_systems = b.safety_systems ? String(b.safety_systems).trim() : null;
+    const eqParsed = equipmentFromBody(b);
+    const trim_level = eqParsed.trim_level;
+    const interior = eqParsed.interior;
+    const interior_details = eqParsed.interior_details;
+    const safety_systems = eqParsed.safety_systems;
+    const equipment = sanitizeEquipmentForDb(eqParsed.equipment);
     const show_phone = b.show_phone !== false && b.show_phone !== "false";
     const plateRaw = b.plate_number ? String(b.plate_number).trim() : null;
     const image_urls = Array.isArray(b.image_urls)
@@ -94,8 +100,8 @@ export function registerProtectedListingRoutes(
         `INSERT INTO listings (
            user_id, title, description, brand, model, year, mileage_km, price_byn,
            fuel_type, transmission, body_type, city, status, source,
-           trim_level, interior, interior_details, safety_systems, show_phone, plate_number
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'user',$14,$15,$16,$17,$18,$19)
+           trim_level, interior, interior_details, safety_systems, equipment, show_phone, plate_number
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'user',$14,$15,$16,$17,$18::jsonb,$19,$20)
          RETURNING id`,
         [
           userId,
@@ -115,6 +121,7 @@ export function registerProtectedListingRoutes(
           interior ? interior.slice(0, 120) : null,
           interior_details ? interior_details.slice(0, 2000) : null,
           safety_systems ? safety_systems.slice(0, 2000) : null,
+          JSON.stringify(equipment),
           show_phone,
           plate_number,
         ]
