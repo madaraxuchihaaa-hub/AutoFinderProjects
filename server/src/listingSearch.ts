@@ -1,6 +1,52 @@
 import type { Pool } from "pg";
 import { getUsdPerByn } from "./exchangeRates.js";
 
+/** Ключ фильтра → подстроки для ILIKE (латиница + русские подписи в БД). */
+const FUEL_ILIKE_ALTS: Record<string, string[]> = {
+  petrol: ["petrol", "бензин", "gasoline"],
+  diesel: ["diesel", "дизель"],
+  electric: ["electric", "электро", "электрич"],
+  hybrid: ["hybrid", "гибрид"],
+  gas: ["gas", "газ", "lpg", "метан", "пропан"],
+  other: ["other", "другое"],
+};
+
+const TRANS_ILIKE_ALTS: Record<string, string[]> = {
+  manual: ["manual", "механика", "мех"],
+  automatic: ["automatic", "автомат", "акпп"],
+  robot: ["robot", "робот"],
+  cvt: ["cvt", "вариатор"],
+  other: ["other", "другое"],
+};
+
+const BODY_ILIKE_ALTS: Record<string, string[]> = {
+  sedan: ["sedan", "седан"],
+  hatchback: ["hatchback", "хэтчбек", "лифтбек", "liftback"],
+  suv: ["suv", "внедорожник", "кроссовер"],
+  wagon: ["wagon", "универсал"],
+  coupe: ["coupe", "купе", "кабриолет", "cabrio"],
+  van: ["van", "минивэн", "фургон"],
+  pickup: ["pickup", "пикап"],
+  motorcycle: ["motorcycle", "мото"],
+  other: ["other", "другое"],
+};
+
+function pushIlikeAny(
+  column: string,
+  raw: string,
+  alts: Record<string, string[]>,
+  conditions: string[],
+  vals: unknown[],
+  i: number
+): number {
+  const key = raw.trim().toLowerCase();
+  const parts = (alts[key] ?? [key]).map((p) => `%${p}%`);
+  const slots = parts.map((_, idx) => `${column} ILIKE $${i + idx}`);
+  conditions.push(`(${slots.join(" OR ")})`);
+  vals.push(...parts);
+  return i + parts.length;
+}
+
 export type ListingSearchParams = {
   brand?: string;
   model?: string;
@@ -78,16 +124,13 @@ export async function searchPublishedListings(
     vals.push(Math.round(params.volumeTo * 1000));
   }
   if (params.transmission?.trim()) {
-    conditions.push(`l.transmission ILIKE $${i++}`);
-    vals.push(params.transmission.trim());
+    i = pushIlikeAny("l.transmission", params.transmission, TRANS_ILIKE_ALTS, conditions, vals, i);
   }
   if (params.bodyType?.trim()) {
-    conditions.push(`l.body_type ILIKE $${i++}`);
-    vals.push(params.bodyType.trim());
+    i = pushIlikeAny("l.body_type", params.bodyType, BODY_ILIKE_ALTS, conditions, vals, i);
   }
   if (params.fuelType?.trim()) {
-    conditions.push(`l.fuel_type ILIKE $${i++}`);
-    vals.push(params.fuelType.trim());
+    i = pushIlikeAny("l.fuel_type", params.fuelType, FUEL_ILIKE_ALTS, conditions, vals, i);
   }
   if (params.drivetrain?.trim()) {
     conditions.push(`l.drivetrain ILIKE $${i++}`);

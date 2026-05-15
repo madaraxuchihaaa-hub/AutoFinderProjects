@@ -3,11 +3,9 @@ import {
   FUEL,
   STATUS,
   TRANS,
-  FILTER_BODY,
   FILTER_DRIVE,
-  FILTER_FUEL,
-  FILTER_TRANS,
   label,
+  normalizeCatalogFilterQuery,
 } from "./labels.js";
 import { CMP_MAX, createSavedStore } from "./saved.js";
 import {
@@ -29,6 +27,22 @@ import {
 const TOKEN_KEY = "af_token";
 const USER_KEY = "af_user";
 const PAGE_SIZE = 20;
+const THEME_KEY = "af_web_theme";
+
+function initWebTheme() {
+  document.documentElement.setAttribute(
+    "data-theme",
+    localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark"
+  );
+}
+
+function setWebTheme(mode) {
+  const m = mode === "light" ? "light" : "dark";
+  localStorage.setItem(THEME_KEY, m);
+  document.documentElement.setAttribute("data-theme", m);
+}
+
+initWebTheme();
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -174,10 +188,16 @@ function fmtDt(s) {
 }
 
 function parseRoute() {
-  const hash = location.hash.replace(/^#/, "") || "/listings";
+  const hash = location.hash.replace(/^#/, "") || "/home";
   const [path, qs] = hash.split("?");
   const parts = path.split("/").filter(Boolean);
   const query = Object.fromEntries(new URLSearchParams(qs || ""));
+  if (parts[0] === "home") return { page: "home", query };
+  if (parts[0] === "feed" && parts[1]) return { page: "feed", id: parts[1], query };
+  if (parts[0] === "platforms") return { page: "platforms", query };
+  if (parts[0] === "settings") return { page: "settings", query };
+  if (parts[0] === "staff" && parts[1]) return { page: "staff-review", id: parts[1], query };
+  if (parts[0] === "staff") return { page: "staff", query };
   if (parts[0] === "listings" && parts[1]) return { page: "listing", id: parts[1], query };
   if (parts[0] === "listings") return { page: "listings", query };
   if (parts[0] === "login") return { page: "login", query };
@@ -189,7 +209,7 @@ function parseRoute() {
   if (parts[0] === "favorites") return { page: "favorites", query };
   if (parts[0] === "my-listings") return { page: "my-listings", query };
   if (parts[0] === "create") return { page: "create-listing", query };
-  return { page: "listings", query };
+  return { page: "home", query };
 }
 
 function navHref(path) {
@@ -202,8 +222,10 @@ function renderNav() {
   const user = getUser();
   const cmp = saved?.compareCount ?? 0;
   let html = `
+    <a href="${navHref("/home")}">Главная</a>
     <a href="${navHref("/listings")}">Каталог</a>
     <a href="${navHref("/compare")}">Сравнение${cmp ? ` (${cmp})` : ""}</a>
+    <a href="${navHref("/platforms")}">Площадки</a>
     <a href="${navHref("/help")}">Справка</a>
   `;
   if (user) {
@@ -213,16 +235,18 @@ function renderNav() {
       <a class="nav-cta" href="#/create">Подать объявление</a>
       <a href="${navHref("/favorites")}">Избранное</a>
       <a href="${navHref("/messages")}">Сообщения</a>
+      <a href="${navHref("/settings")}">Тема</a>
     `;
     if (user.role === "moderator" || user.role === "admin") {
-      html += `<a href="${navHref("/help")}" title="Модерация в мобильном приложении">Модерация</a>`;
+      html += `<a href="${navHref("/staff")}">Модерация</a>`;
     }
     if (user.role === "admin") {
-      html += `<a href="${navHref("/help")}" title="Админка в мобильном приложении">Админ</a>`;
+      html += `<span class="muted small" title="Роли и пользователи — в приложении">Админ</span>`;
     }
     html += `<button type="button" class="linkish" id="btn-logout">Выйти (${esc(user.full_name || user.email)})</button>`;
   } else {
     html += `
+      <a href="${navHref("/settings")}">Тема</a>
       <a href="${navHref("/login")}">Вход</a>
       <a href="${navHref("/register")}">Регистрация</a>
     `;
@@ -232,7 +256,7 @@ function renderNav() {
   if (lo) {
     lo.addEventListener("click", () => {
       setUser(null, null);
-      location.hash = "#/listings";
+      location.hash = "#/home";
     });
   }
 }
@@ -373,6 +397,7 @@ function buildListParams(q) {
 }
 
 async function pageListings(query) {
+  query = normalizeCatalogFilterQuery(query);
   await loadRate();
   const app = $("#app");
   document.title = "Каталог — AutoFinder";
@@ -392,9 +417,15 @@ async function pageListings(query) {
 
   const optList = (vals, sel) =>
     vals.map((v) => `<option value="${esc(v)}" ${sel === v ? "selected" : ""}>${esc(v)}</option>`).join("");
-  const fuelOpts = optList(FILTER_FUEL, query.fuel);
-  const bodyOpts = optList(FILTER_BODY, query.body);
-  const transOpts = optList(FILTER_TRANS, query.transmission);
+  const fuelOpts = `<option value="">—</option>${Object.entries(FUEL)
+    .map(([k, v]) => `<option value="${esc(k)}" ${query.fuel === k ? "selected" : ""}>${esc(v)}</option>`)
+    .join("")}`;
+  const bodyOpts = `<option value="">—</option>${Object.entries(BODY)
+    .map(([k, v]) => `<option value="${esc(k)}" ${query.body === k ? "selected" : ""}>${esc(v)}</option>`)
+    .join("")}`;
+  const transOpts = `<option value="">—</option>${Object.entries(TRANS)
+    .map(([k, v]) => `<option value="${esc(k)}" ${query.transmission === k ? "selected" : ""}>${esc(v)}</option>`)
+    .join("")}`;
   const driveOpts = optList(FILTER_DRIVE, query.drivetrain);
   const brandOpts = brands
     .map((b) => `<option value="${esc(b.name)}" ${query.brand === b.name ? "selected" : ""}>${esc(b.name)}</option>`)
@@ -405,7 +436,7 @@ async function pageListings(query) {
       <div class="hero-catalog__main">
         <p class="hero-kicker">AutoFinder</p>
         <h1>Каталог автомобилей и мототехники</h1>
-        <p class="muted">Подбор по цене, пробегу, кузову и городу. Сохраняйте интересные варианты в избранное и отслеживайте популярные объявления.</p>
+        <p class="muted">Подбор по цене, году, кузову, топливу, коробке и объёму двигателя. Сохраняйте варианты в избранное.</p>
       </div>
       <div class="hero-catalog__stats">
         <div class="hero-stat"><span class="hero-stat__label">Найдено</span><strong class="hero-stat__value">${total}</strong></div>
@@ -414,6 +445,19 @@ async function pageListings(query) {
       </div>
     </section>
 
+    <datalist id="catalog-volume-presets">
+      <option value="1.0"></option>
+      <option value="1.2"></option>
+      <option value="1.4"></option>
+      <option value="1.5"></option>
+      <option value="1.6"></option>
+      <option value="1.8"></option>
+      <option value="2.0"></option>
+      <option value="2.5"></option>
+      <option value="3.0"></option>
+      <option value="3.5"></option>
+      <option value="4.0"></option>
+    </datalist>
     <form class="filters card" id="search-form">
       <div class="filters-grid">
         <label><span>Текст</span><input type="search" name="q" value="${esc(query.q || "")}" placeholder="Например: Toyota седан" /></label>
@@ -423,13 +467,13 @@ async function pageListings(query) {
         <label><span>Цена до</span><input type="number" name="price_max" min="0" step="1000" value="${esc(query.price_max || "")}" /></label>
         <label><span>Год от</span><input type="number" name="year_min" min="1950" max="2100" value="${esc(query.year_min || "")}" /></label>
         <label><span>Год до</span><input type="number" name="year_max" min="1950" max="2100" value="${esc(query.year_max || "")}" /></label>
-        <label><span>Топливо</span><select name="fuel"><option value="">—</option>${fuelOpts}</select></label>
-        <label><span>Кузов</span><select name="body"><option value="">—</option>${bodyOpts}</select></label>
-        <label><span>Коробка</span><select name="transmission"><option value="">—</option>${transOpts}</select></label>
+        <label><span>Топливо</span><select name="fuel" aria-describedby="filter-fuel-hint">${fuelOpts}</select><span class="filter-field-hint" id="filter-fuel-hint">Как в карточке объявления</span></label>
+        <label><span>Кузов</span><select name="body" aria-describedby="filter-body-hint">${bodyOpts}</select><span class="filter-field-hint" id="filter-body-hint">Тип кузова</span></label>
+        <label><span>Коробка</span><select name="transmission" aria-describedby="filter-trans-hint">${transOpts}</select><span class="filter-field-hint" id="filter-trans-hint">Тип КПП</span></label>
         <label><span>Привод</span><select name="drivetrain"><option value="">—</option>${driveOpts}</select></label>
         <label><span>Поколение</span><input type="text" name="generation" value="${esc(query.generation || "")}" placeholder="рестайлинг" /></label>
-        <label><span>Объём от, л</span><input type="number" name="volume_from" min="0" step="0.1" value="${esc(query.volume_from || "")}" /></label>
-        <label><span>Объём до, л</span><input type="number" name="volume_to" min="0" step="0.1" value="${esc(query.volume_to || "")}" /></label>
+        <label><span>Объём от, л</span><input type="number" name="volume_from" min="0" step="0.1" list="catalog-volume-presets" value="${esc(query.volume_from || "")}" aria-describedby="filter-volume-hint" /></label>
+        <label><span>Объём до, л</span><input type="number" name="volume_to" min="0" step="0.1" list="catalog-volume-presets" value="${esc(query.volume_to || "")}" aria-describedby="filter-volume-hint" /></label>
         <label><span>Валюта цены</span><select name="currency"><option value="byn" ${query.currency !== "usd" ? "selected" : ""}>BYN</option><option value="usd" ${query.currency === "usd" ? "selected" : ""}>USD</option></select></label>
         <label><span>Город</span><input type="text" name="city" value="${esc(query.city || "")}" placeholder="Минск" /></label>
         <label class="filter-toggle"><span>Медиа</span>
@@ -438,6 +482,10 @@ async function pageListings(query) {
           </span>
         </label>
       </div>
+      <p class="filters-hint muted small" id="filter-volume-hint">
+        Объём учитывается только для объявлений, где продавец указал литраж. Подсказки при вводе — из списка частых значений.
+        Топливо и коробка — те же значения, что при подаче объявления (бензин, дизель, механика, автомат и т.д.).
+      </p>
       <div class="filters-actions">
         <button type="submit">Найти</button>
         <a class="button ghost" href="#/listings">Сбросить</a>
@@ -885,7 +933,7 @@ async function pageLogin() {
         body: JSON.stringify({ email: fd.get("email"), password: fd.get("password") }),
       });
       setUser(data.user, data.accessToken);
-      location.hash = "#/listings";
+      location.hash = "#/home";
     } catch (ex) {
       err.classList.remove("hidden");
       err.textContent =
@@ -926,7 +974,7 @@ async function pageRegister() {
         }),
       });
       setUser(data.user, data.accessToken);
-      location.hash = "#/listings";
+      location.hash = "#/home";
     } catch (ex) {
       err.classList.remove("hidden");
       err.textContent = ex.data?.message || ex.message;
@@ -950,9 +998,315 @@ function pageHelp() {
     </section>
     <section class="card help-section"><h2>1. Как найти подходящий автомобиль</h2><ol><li>Откройте <a href="#/listings">каталог</a>.</li><li>Задайте марку, модель, цену, год, тип кузова и другие фильтры.</li><li>Включите фильтр «Только с фото».</li><li>Откройте карточку объявления для описания, фотографий и контактов.</li></ol></section>
     <section class="card help-section"><h2>2. Как связаться с продавцом</h2><ul><li>Если продавец разрешил показ телефона — кнопка «Позвонить продавцу».</li><li>Напишите через форму сообщения на странице объявления (нужен вход).</li><li>Все переписки — в разделе «Сообщения».</li></ul></section>
-    <section class="card help-section"><h2>3. Как разместить объявление</h2><ol><li>Зарегистрируйтесь или войдите.</li><li>Размещение объявлений — в мобильном приложении AutoFinder.</li><li>После сохранения объявление может перейти на модерацию.</li></ol></section>
+    <section class="card help-section"><h2>3. Как разместить объявление</h2><ol><li>Зарегистрируйтесь или войдите.</li><li>Подайте объявление на сайте (<a href="#/create">форма</a>) или в мобильном приложении.</li><li>После сохранения объявление может перейти на модерацию.</li></ol></section>
     <section class="card help-section"><h2>4. Избранное и сравнение</h2><ul><li>После входа избранное и сравнение (до ${CMP_MAX} авто) синхронизируются с мобильным приложением.</li><li>Без входа данные хранятся только в этом браузере.</li><li>Калькулятор платежа на странице объявления — ориентировочный.</li></ul></section>
+    <section class="card help-section"><h2>5. Модерация и админ</h2><p>Модераторы и администраторы обрабатывают заявки на <a href="#/staff">странице модерации</a> (как в приложении). Управление пользователями и ролями — в мобильном приложении.</p></section>
   `;
+}
+
+async function pageHome() {
+  await loadRate();
+  const app = $("#app");
+  document.title = "Главная — AutoFinder";
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  let stats = null;
+  let featured = [];
+  let err = "";
+  try {
+    const [s, a] = await Promise.all([api("/api/stats"), api("/api/aggregated?limit=8")]);
+    stats = s;
+    featured = Array.isArray(a) ? a : [];
+  } catch (e) {
+    err = e.message || "Нет связи с API";
+  }
+  const cards = featured.length
+    ? featured
+        .map((item) => {
+          const raw = item.image_urls;
+          const urls = Array.isArray(raw) ? raw : typeof raw === "string" ? [raw] : [];
+          const src = urls[0] ? resolveMediaUrl(String(urls[0])) : "";
+          const ph = src
+            ? imgTag(src, item.title || "", "home-mini__img")
+            : `<div class="home-mini-ph muted small">Нет фото</div>`;
+          return `<figure class="home-mini"><a href="#/feed/${esc(item.id)}">${ph}<figcaption>${esc(item.title || "Без названия")}</figcaption></a></figure>`;
+        })
+        .join("")
+    : '<p class="muted small">В ленте пока нет карточек.</p>';
+
+  app.innerHTML = `
+    <section class="home-hero card">
+      <p class="hero-kicker">AutoFinder</p>
+      <h1>Подбор и продажа</h1>
+      <p class="muted">Один аккаунт на сайте и в приложении: избранное, сравнение и сообщения синхронизируются после входа.</p>
+      ${err ? `<p class="banner banner-err">${esc(err)}</p>` : ""}
+      <div class="home-stats">
+        <div class="home-stat"><strong>${stats?.publishedListings ?? "—"}</strong><span class="muted small">Опубликовано</span></div>
+        <div class="home-stat"><strong>${stats?.queuePending ?? "—"}</strong><span class="muted small">В очереди публикаций</span></div>
+        <div class="home-stat"><strong>${stats?.aggregated ?? "—"}</strong><span class="muted small">В ленте (агрегат)</span></div>
+      </div>
+      <div class="home-actions">
+        <a class="button" href="#/listings">Каталог</a>
+        <a class="button ghost" href="#/my-listings">Мои объявления</a>
+        <a class="button ghost" href="#/create">Новое объявление</a>
+        <a class="button ghost" href="#/favorites">Избранное</a>
+        <a class="button ghost" href="#/messages">Сообщения</a>
+      </div>
+    </section>
+    <section class="card">
+      <h2>Свежие в ленте</h2>
+      <p class="muted small">Карточки с внешних площадок. Объявления пользователей — в каталоге.</p>
+      <div class="home-featured">${cards}</div>
+    </section>
+  `;
+}
+
+async function pageFeed(id) {
+  await loadRate();
+  const app = $("#app");
+  document.title = "Лента — AutoFinder";
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  let item;
+  try {
+    item = await api(`/api/aggregated/${encodeURIComponent(id)}`);
+  } catch {
+    app.innerHTML = `<section class="hero"><h1>Не найдено</h1><p class="muted"><a href="#/home">На главную</a></p></section>`;
+    return;
+  }
+  const raw = item.image_urls;
+  const urls = (Array.isArray(raw) ? raw : []).map((u) => resolveMediaUrl(String(u))).filter(Boolean);
+  const main = urls[0] || null;
+  const brandModel = [item.brand, item.model].filter(Boolean).join(" ").trim() || "—";
+  document.title = `${item.title || "Карточка"} — AutoFinder`;
+  app.innerHTML = `
+    <p class="banner muted small"><a href="#/home">← Главная</a> · <span class="ls-av__badge-inline">Рынок (агрегат)</span></p>
+    <div class="ls-av" id="listing-av-card">
+      <header class="ls-av__top">
+        <h1 class="ls-av__title">${esc(item.title)}</h1>
+        <div class="ls-av__meta-line muted small">Обновлено: ${item.fetched_at ? esc(fmtDt(item.fetched_at)) : "—"}</div>
+      </header>
+      <div class="ls-av__wrap">
+        <div class="ls-av__gallery">
+          <div class="ls-av__stage">
+            ${main ? imgTag(main, item.title, "ls-av__stage-img") : `<div class="ls-av__stage-placeholder">Нет фотографий</div>`}
+          </div>
+        </div>
+        <aside class="ls-av__side">
+          <div class="ls-av__side-inner">
+            <div class="ls-av__prices">
+              <div class="ls-av__price-primary"><span class="ls-av__price-value">${esc(fmtByn(item.price_byn).replace(" BYN", ""))}</span><span class="ls-av__price-cur">BYN</span></div>
+              <div class="ls-av__price-secondary">${fmtUsd(item.price_byn)}</div>
+            </div>
+            <p class="ls-av__params">${item.year ? `${item.year} г.` : "—"} · ${esc(item.city || "—")}</p>
+          </div>
+          <p class="muted small">Чтобы написать продавцу, откройте объявление пользователя в <a href="#/listings">каталоге</a>.</p>
+        </aside>
+      </div>
+      <div class="ls-av__panels ls-av__panels--specs">
+        <section class="ls-av__panel ls-av__panel--wide">
+          <h2 class="ls-av__panel-title">Параметры</h2>
+          ${specsGridHtml([
+            ["Марка / модель", brandModel],
+            ["Год", item.year != null ? String(item.year) : "—"],
+            [
+              "Пробег",
+              item.mileage_km != null ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км` : "—",
+            ],
+            ["Город", item.city || "—"],
+          ])}
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+async function pagePlatforms() {
+  const app = $("#app");
+  document.title = "Площадки — AutoFinder";
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  let rows = [];
+  try {
+    rows = await api("/api/platforms");
+  } catch {
+    rows = [];
+  }
+  const body = rows.length
+    ? rows
+        .map(
+          (p) => `
+      <article class="card" style="margin-bottom:0.75rem">
+        <strong>${esc(p.name)}</strong> <span class="muted small">${esc(p.code)}</span>
+        ${p.base_url ? `<p class="muted small" style="margin:0.35rem 0 0"><a href="${attrEsc(p.base_url)}" rel="noopener noreferrer" target="_blank">${esc(p.base_url)}</a></p>` : ""}
+      </article>`
+        )
+        .join("")
+    : '<p class="muted">Список площадок пуст.</p>';
+  app.innerHTML = `
+    <section class="hero"><h1>Площадки размещения</h1><p class="muted">Источники объявлений в общей ленте (как в приложении).</p></section>
+    ${body}
+  `;
+}
+
+function pageSettings() {
+  const app = $("#app");
+  document.title = "Тема оформления — AutoFinder";
+  const cur = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+  app.innerHTML = `
+    <section class="hero"><h1>Тема сайта</h1><p class="muted">Сохраняется в этом браузере. В приложении тема настраивается отдельно.</p></section>
+    <section class="card narrow-profile">
+      <h2>Оформление</h2>
+      <div class="settings-theme-row">
+        <button type="button" class="settings-theme-btn${cur === "dark" ? " is-on" : ""}" data-theme-pick="dark">Тёмная</button>
+        <button type="button" class="settings-theme-btn${cur === "light" ? " is-on" : ""}" data-theme-pick="light">Светлая</button>
+      </div>
+      <p class="muted small"><a href="#/home">На главную</a></p>
+    </section>
+  `;
+  $$("[data-theme-pick]", app).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setWebTheme(btn.getAttribute("data-theme-pick"));
+      pageSettings();
+    });
+  });
+}
+
+function isStaffUser() {
+  const u = getUser();
+  return u && (u.role === "moderator" || u.role === "admin");
+}
+
+async function pageStaff() {
+  const app = $("#app");
+  if (!getUser()) {
+    location.hash = "#/login";
+    return;
+  }
+  if (!isStaffUser()) {
+    document.title = "Доступ — AutoFinder";
+    app.innerHTML = `<section class="hero"><h1>Нет доступа</h1><p class="muted">Модерация доступна модераторам и администраторам.</p></section>`;
+    return;
+  }
+  document.title = "Модерация — AutoFinder";
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  let rows = [];
+  try {
+    rows = await api("/api/staff/pending-listings");
+  } catch (e) {
+    app.innerHTML = `<section class="hero"><h1>Ошибка</h1><p class="error">${esc(e.message)}</p><p><a href="#/home">Главная</a></p></section>`;
+    return;
+  }
+  const list = rows.length
+    ? rows
+        .map((row) => {
+          const img = firstImageUrl(row);
+          return `<article class="staff-card">
+            <div>${img ? imgTag(img, row.title, "profile-listing-card__img") : `<div class="placeholder">Нет фото</div>`}</div>
+            <div class="staff-card__meta">
+              <strong><a href="#/staff/${esc(row.id)}">${esc(row.title)}</a></strong>
+              <div class="muted small">${esc(row.brand)} ${esc(row.model)} · ${esc(String(row.year || ""))}</div>
+              <div class="muted small">${esc(row.owner_email || "")}</div>
+            </div>
+            <a class="button" href="#/staff/${esc(row.id)}">Проверить</a>
+          </article>`;
+        })
+        .join("")
+    : '<p class="empty">Нет заявок на модерации.</p>';
+  app.innerHTML = `
+    <section class="hero"><h1>Модерация</h1><p class="muted">Заявки в статусе «на проверке». Одобрение и отклонение — как в приложении.</p></section>
+    <div class="staff-queue">${list}</div>
+  `;
+}
+
+async function pageStaffReview(id) {
+  const app = $("#app");
+  if (!getUser()) {
+    location.hash = "#/login";
+    return;
+  }
+  if (!isStaffUser()) {
+    location.hash = "#/staff";
+    return;
+  }
+  document.title = "Проверка заявки — AutoFinder";
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  await loadEquipmentCatalog(api);
+  let item;
+  try {
+    item = await api(`/api/staff/pending-listings/${encodeURIComponent(id)}`);
+  } catch {
+    app.innerHTML = `<section class="hero"><h1>Заявка не найдена</h1><p class="muted"><a href="#/staff">К списку</a></p></section>`;
+    return;
+  }
+  const eqSections = parseListingEquipment(item);
+  const equipmentHtml = equipmentDisplayHtml(eqSections, esc);
+  const specRows = listingSpecRows(item);
+  const imgs = parseImagesField(item.images)
+    .map((p) => resolveMediaUrl(p))
+    .filter(Boolean);
+  const mainSrc = imgs[0] || null;
+  app.innerHTML = `
+    <p class="muted small"><a href="#/staff">← Все заявки</a></p>
+    <div class="banner banner-warn">Проверка заявки: одобрить или отклонить с причиной (синхронизируется с приложением).</div>
+    <div class="ls-av">
+      <header class="ls-av__top">
+        <h1 class="ls-av__title">${esc(item.title)}</h1>
+        <p class="muted small">Автор: ${esc(item.owner_email || "")} ${item.owner_name ? `· ${esc(item.owner_name)}` : ""}</p>
+      </header>
+      <div class="ls-av__wrap">
+        <div class="ls-av__gallery">
+          <div class="ls-av__stage">
+            ${mainSrc ? imgTag(mainSrc, item.title, "ls-av__stage-img") : `<div class="ls-av__stage-placeholder">Нет фото</div>`}
+          </div>
+        </div>
+        <aside class="ls-av__side">
+          <div class="ls-av__side-inner">
+            <div class="ls-av__prices"><div class="ls-av__price-primary"><span class="ls-av__price-value">${esc(fmtByn(item.price_byn).replace(" BYN", ""))}</span><span class="ls-av__price-cur">BYN</span></div></div>
+          </div>
+        </aside>
+      </div>
+      ${equipmentHtml}
+      <div class="ls-av__panels ls-av__panels--specs">
+        <section class="ls-av__panel ls-av__panel--wide">
+          <h2 class="ls-av__panel-title">Характеристики</h2>
+          ${specsGridHtml(specRows)}
+        </section>
+        <section class="ls-av__panel ls-av__panel--wide">
+          <h2 class="ls-av__panel-title">Описание</h2>
+          <div class="ls-av__description">${esc(item.description || "—").replace(/\n/g, "<br />")}</div>
+        </section>
+      </div>
+      <div class="card stack" style="margin-top:1rem">
+        <button type="button" class="button" id="staff-approve" data-id="${esc(item.id)}">Одобрить</button>
+        <form id="staff-reject-form" class="stack" data-id="${esc(item.id)}">
+          <label>Причина отклонения<textarea name="reason" rows="2" maxlength="500" placeholder="Необязательно, но лучше указать"></textarea></label>
+          <button type="submit" class="button ghost danger-outline">Отклонить</button>
+        </form>
+      </div>
+    </div>
+  `;
+  $("#staff-approve")?.addEventListener("click", async () => {
+    if (!confirm("Одобрить и опубликовать объявление?")) return;
+    try {
+      await api(`/api/staff/pending-listings/${encodeURIComponent(id)}/approve`, { method: "POST", body: "{}" });
+      location.hash = "#/staff";
+    } catch (e) {
+      alert(e.message || "Ошибка");
+    }
+  });
+  $("#staff-reject-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!confirm("Отклонить заявку?")) return;
+    const fd = new FormData(e.target);
+    const reason = fd.get("reason")?.toString().trim() || null;
+    try {
+      await api(`/api/staff/pending-listings/${encodeURIComponent(id)}/reject`, {
+        method: "POST",
+        body: JSON.stringify({ reason }),
+      });
+      location.hash = "#/staff";
+    } catch (err) {
+      alert(err.message || "Ошибка");
+    }
+  });
 }
 
 async function pageCompare() {
@@ -1089,11 +1443,19 @@ async function pageProfile() {
     /* keep cached */
   }
   $("#app").innerHTML = `
-    <section class="hero"><h1>Профиль</h1><p class="muted">${esc(me.email)}</p></section>
+    <section class="hero"><h1>Профиль</h1><p class="muted">${esc(me.email)}</p><p class="muted small">Избранное, сравнение и чаты после входа совпадают с мобильным приложением.</p></section>
     <div class="profile-shortcuts">
       <a class="card profile-shortcut" href="#/my-listings"><strong>Мои объявления</strong><span class="muted small">Статусы и редактирование</span></a>
       <a class="card profile-shortcut" href="#/favorites"><strong>Избранное</strong><span class="muted small">Сохранённые объявления</span></a>
+      <a class="card profile-shortcut" href="#/compare"><strong>Сравнение</strong><span class="muted small">До ${CMP_MAX} авто</span></a>
       <a class="card profile-shortcut" href="#/messages"><strong>Сообщения</strong><span class="muted small">Переписка с покупателями</span></a>
+      <a class="card profile-shortcut" href="#/platforms"><strong>Площадки</strong><span class="muted small">Источники ленты</span></a>
+      <a class="card profile-shortcut" href="#/settings"><strong>Тема сайта</strong><span class="muted small">Только в браузере</span></a>
+      ${
+        me.role === "moderator" || me.role === "admin"
+          ? `<a class="card profile-shortcut" href="#/staff"><strong>Модерация</strong><span class="muted small">Заявки на публикацию</span></a>`
+          : ""
+      }
     </div>
     <section class="card narrow-profile profile-form">
       <h2>Данные аккаунта</h2>
@@ -1186,7 +1548,7 @@ async function pageMyListings() {
 async function router() {
   const route = parseRoute();
   if (location.hash === "#/" || location.hash === "#") {
-    location.replace("#/listings");
+    location.replace("#/home");
     return;
   }
   try {
@@ -1205,6 +1567,24 @@ async function router() {
         break;
       case "help":
         pageHelp();
+        break;
+      case "home":
+        await pageHome();
+        break;
+      case "feed":
+        await pageFeed(route.id);
+        break;
+      case "platforms":
+        await pagePlatforms();
+        break;
+      case "settings":
+        pageSettings();
+        break;
+      case "staff":
+        await pageStaff();
+        break;
+      case "staff-review":
+        await pageStaffReview(route.id);
         break;
       case "compare":
         await pageCompare();
@@ -1225,7 +1605,7 @@ async function router() {
         await pageCreateListing(route.query.edit);
         break;
       default:
-        await pageListings(route.query);
+        await pageHome();
     }
   } catch (e) {
     $("#app").innerHTML = `<p class="error">Ошибка: ${esc(e.message)}</p>`;
@@ -1236,7 +1616,7 @@ async function boot() {
   await saved.refresh();
   renderNav();
   window.addEventListener("hashchange", router);
-  if (!location.hash || location.hash === "#") location.hash = "#/listings";
+  if (!location.hash || location.hash === "#") location.hash = "#/home";
   else await router();
 }
 

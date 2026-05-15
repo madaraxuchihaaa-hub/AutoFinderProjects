@@ -1,7 +1,6 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
-import path from "node:path";
 import { ensureJwtSecretConfigured } from "./auth/jwt.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { optionalAuth, requireAdmin, requireAuth, requireStaff } from "./auth/middleware.js";
@@ -20,6 +19,7 @@ import { seedCarCatalogIfNeeded } from "./seedCarCatalog.js";
 import { registerUploadRoutes } from "./uploadRoutes.js";
 import { registerVehicleRoutes } from "./vehicleRoutes.js";
 import { hasWebBuild, registerWeb } from "./serveWeb.js";
+import { ensureUploadsDir } from "./uploadPaths.js";
 
 dotenv.config();
 
@@ -28,7 +28,7 @@ app.set("trust proxy", 1);
 app.use(cors({ origin: true }));
 app.use(express.json());
 
-const uploadsDir = path.join(process.cwd(), "uploads");
+const uploadsDir = ensureUploadsDir();
 app.use("/uploads", express.static(uploadsDir));
 
 app.get("/api/stats", async (_req, res) => {

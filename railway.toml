@@ -4,7 +4,8 @@
 #   JWT_SECRET      — случайная строка 32+ символов
 #   DATABASE_URL    — PostgreSQL (или PGHOST/PGUSER/…)
 #   PUBLIC_BASE_URL — https://<ваш-домен> (обязательно https, иначе фото не грузятся)
-#   Том Railway: смонтировать volume на /app/uploads (иначе фото пропадают после деплоя)
+#   Фото: по умолчанию папка server/uploads (рядом с кодом). Том Railway смонтируйте на этот путь,
+#   например mount path = server/uploads (или задайте UPLOAD_DIR и смонтируйте туда же).
 #
 # Быстрее: Settings → Root Directory = server (тогда startCommand = npm start).
 [build]
