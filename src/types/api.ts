@@ -23,6 +23,14 @@ export type ListingRow = {
   price_byn?: string | number;
   price_rub?: string | number;
   city: string | null;
+  fuel_type?: string | null;
+  transmission?: string | null;
+  body_type?: string | null;
+  engine_volume_ml?: number | null;
+  drivetrain?: string | null;
+  color?: string | null;
+  vin?: string | null;
+  trim_level?: string | null;
   status: string;
   created_at: string;
   images: string[];

@@ -19,6 +19,7 @@ import type { ListingRow } from "../types/api";
 import { readPriceByn } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
 import { formatKm } from "../utils/format";
+import { formatEngineMl } from "../utils/listingFormat";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Compare">;
 
@@ -28,6 +29,9 @@ const SPECS: { key: string; fn: (i: ListingRow) => string }[] = [
   { key: "Топливо", fn: (i) => i.fuel_type ?? "—" },
   { key: "Коробка", fn: (i) => i.transmission ?? "—" },
   { key: "Кузов", fn: (i) => i.body_type ?? "—" },
+  { key: "Привод", fn: (i) => i.drivetrain ?? "—" },
+  { key: "Объём", fn: (i) => formatEngineMl(i.engine_volume_ml) },
+  { key: "Цвет", fn: (i) => i.color ?? "—" },
   { key: "Город", fn: (i) => i.city ?? "—" },
 ];
 

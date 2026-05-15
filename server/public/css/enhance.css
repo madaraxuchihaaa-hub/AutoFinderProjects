@@ -144,6 +144,60 @@ body {
 .ls-av__specs--full dd {
   margin: 0;
   font-weight: 500;
+  color: var(--text);
+}
+
+.ls-av__side-specs {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.75rem 0;
+}
+
+.ls-av__side-spec {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.ls-av__side-spec span {
+  color: var(--muted);
+}
+
+.ls-av__side-spec strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.catalog-card__specs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.75rem;
+  margin: 0.55rem 0 0;
+  padding: 0;
+}
+
+.catalog-card__specs > div {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.catalog-card__specs dt {
+  margin: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.catalog-card__specs dd {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .ls-av__equipment-toggle {
@@ -162,6 +216,7 @@ body {
 .eq-block legend {
   font-weight: 700;
   padding: 0 0.35rem;
+  color: var(--text);
 }
 
 .eq-field {
@@ -173,6 +228,10 @@ body {
   font-size: 0.85rem;
   color: var(--muted);
   margin-bottom: 0.35rem;
+}
+
+.eq-field__hint {
+  color: var(--muted);
 }
 
 .eq-field__select {
@@ -226,6 +285,7 @@ body {
   gap: 0.4rem;
 }
 
+button.eq-chip,
 .eq-chip {
   border-radius: 999px;
   border: 1px solid var(--border);
@@ -233,13 +293,14 @@ body {
   color: var(--text);
   padding: 0.28rem 0.65rem;
   font-size: 0.82rem;
+  font: inherit;
   cursor: pointer;
 }
 
 .eq-chip.is-on {
   border-color: rgba(61, 139, 253, 0.55);
   background: rgba(61, 139, 253, 0.18);
-  color: #e8eef5;
+  color: var(--text);
 }
 
 .create-listing label {

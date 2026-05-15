@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { apiGet } from "../api/client";
-import { colors, radii, spacing } from "../theme";
+import { usePreferences } from "../preferences/PreferencesContext";
+import type { ThemeColors } from "../theme/colors";
+import { fonts, radii, spacing } from "../theme";
 
 export type EquipmentCatalog = {
   trim_levels: string[];
@@ -28,6 +30,8 @@ export default function EquipmentPickers({
   equipment,
   onEquipmentChange,
 }: Props) {
+  const { colors } = usePreferences();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [catalog, setCatalog] = useState<EquipmentCatalog | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -125,46 +129,73 @@ export default function EquipmentPickers({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: spacing.sm },
-  hint: { color: colors.muted, fontSize: 13 },
-  label: { color: colors.muted, fontSize: 13, marginBottom: 4 },
-  trimRow: { marginBottom: spacing.sm },
-  block: { marginBottom: spacing.xs },
-  toggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  toggleLabel: { color: colors.text, fontSize: 15, fontWeight: "600", flex: 1 },
-  count: { color: colors.accent, fontWeight: "700", fontSize: 14 },
-  panel: {
-    marginTop: 6,
-    padding: 10,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.bg,
-  },
-  chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.card,
-  },
-  chipOn: {
-    borderColor: colors.accent,
-    backgroundColor: "rgba(61, 139, 253, 0.18)",
-  },
-  chipTxt: { color: colors.muted, fontSize: 13 },
-  chipTxtOn: { color: colors.text, fontWeight: "600" },
-});
+function makeStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { gap: spacing.sm },
+    hint: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+    label: {
+      fontFamily: fonts.medium,
+      fontSize: 13,
+      color: colors.textMuted,
+      marginBottom: 4,
+    },
+    trimRow: { marginBottom: spacing.sm },
+    block: { marginBottom: spacing.xs },
+    toggle: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    toggleLabel: {
+      fontFamily: fonts.semibold,
+      fontSize: 15,
+      color: colors.text,
+      flex: 1,
+    },
+    count: {
+      fontFamily: fonts.bold,
+      fontSize: 14,
+      color: colors.accent,
+    },
+    panel: {
+      marginTop: 6,
+      padding: 10,
+      borderRadius: radii.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      backgroundColor: colors.bgElevated,
+    },
+    chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+    chip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+    },
+    chipOn: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accentDim,
+    },
+    chipTxt: {
+      fontFamily: fonts.regular,
+      fontSize: 13,
+      color: colors.text,
+    },
+    chipTxtOn: {
+      fontFamily: fonts.semibold,
+      color: colors.text,
+    },
+  });
+}

@@ -5,7 +5,8 @@ import { getPublicOrigin, withNormalizedImagesList } from "./mediaUrls.js";
 const CMP_MAX = 3;
 
 const LISTING_CARD = `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_byn, l.city,
-  l.fuel_type, l.transmission, l.body_type, l.drivetrain, l.status, l.created_at,
+  l.fuel_type, l.transmission, l.body_type, l.engine_volume_ml, l.drivetrain, l.color, l.trim_level,
+  l.status, l.created_at,
   COALESCE(
     (SELECT json_agg(url ORDER BY sort_order)
      FROM listing_images li WHERE li.listing_id = l.id),

@@ -1,17 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useState } from "react";
+import { CommonActions } from "@react-navigation/native";
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,7 +19,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { useAuth } from "../auth/AuthContext";
 import AdminUserManagement from "../components/AdminUserManagement";
-import { apiGet, apiPost } from "../api/client";
+import { apiGet } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
 import type { PendingListingRow } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
@@ -31,6 +30,15 @@ import { formatKm } from "../utils/format";
 type Props = BottomTabScreenProps<MainTabParamList, "Staff">;
 type Section = "queue" | "users";
 
+function openReview(navigation: Props["navigation"], id: string) {
+  navigation.getParent()?.dispatch(
+    CommonActions.navigate({
+      name: "StaffReviewListing",
+      params: { id },
+    })
+  );
+}
+
 export default function StaffPanelScreen(_props: Props) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -39,9 +47,6 @@ export default function StaffPanelScreen(_props: Props) {
   const [pending, setPending] = useState<PendingListingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [busyId, setBusyId] = useState<string | null>(null);
-  const [rejectModal, setRejectModal] = useState<{ id: string } | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
 
   const loadQueue = useCallback(async () => {
     const data = await apiGet<PendingListingRow[]>("/api/staff/pending-listings");
@@ -77,36 +82,6 @@ export default function StaffPanelScreen(_props: Props) {
       setRefreshing(false);
     }
   }, [loadAll]);
-
-  async function approve(id: string) {
-    setBusyId(id);
-    try {
-      await apiPost<{ ok: boolean }>(`/api/staff/pending-listings/${id}/approve`, {});
-      await loadQueue();
-    } catch (e) {
-      Alert.alert("Ошибка", e instanceof Error ? e.message : "Не удалось одобрить");
-    } finally {
-      setBusyId(null);
-    }
-  }
-
-  async function submitReject() {
-    if (!rejectModal) return;
-    const id = rejectModal.id;
-    setBusyId(id);
-    try {
-      await apiPost(`/api/staff/pending-listings/${id}/reject`, {
-        reason: rejectReason.trim() || undefined,
-      });
-      setRejectModal(null);
-      setRejectReason("");
-      await loadQueue();
-    } catch (e) {
-      Alert.alert("Ошибка", e instanceof Error ? e.message : "Не удалось отклонить");
-    } finally {
-      setBusyId(null);
-    }
-  }
 
   if (loading) {
     return (
@@ -191,7 +166,6 @@ export default function StaffPanelScreen(_props: Props) {
           }
           renderItem={({ item }) => {
             const uri = item.images?.[0];
-            const busy = busyId === item.id;
             return (
               <View style={styles.card}>
                 <View style={styles.cardAccent} />
@@ -215,30 +189,13 @@ export default function StaffPanelScreen(_props: Props) {
                     <Text style={styles.km}>{formatKm(item.mileage_km)}</Text>
                   </View>
                 </View>
-                <View style={styles.actions}>
-                  <Pressable
-                    onPress={() => void approve(item.id)}
-                    disabled={busy}
-                    style={({ pressed }) => [styles.btnOk, pressed && { opacity: 0.9 }]}
-                  >
-                    {busy ? (
-                      <ActivityIndicator color={colors.bg} size="small" />
-                    ) : (
-                      <>
-                        <Ionicons name="checkmark-circle" size={20} color={colors.bg} />
-                        <Text style={styles.btnOkTxt}>Одобрить</Text>
-                      </>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setRejectModal({ id: item.id })}
-                    disabled={busy}
-                    style={({ pressed }) => [styles.btnNo, pressed && { opacity: 0.9 }]}
-                  >
-                    <Ionicons name="close-circle-outline" size={20} color={colors.danger} />
-                    <Text style={styles.btnNoTxt}>Отклонить</Text>
-                  </Pressable>
-                </View>
+                <Pressable
+                  onPress={() => openReview(navigation, item.id)}
+                  style={({ pressed }) => [styles.btnReview, pressed && { opacity: 0.92 }]}
+                >
+                  <Ionicons name="eye-outline" size={20} color={colors.accent} />
+                  <Text style={styles.btnReviewTxt}>Смотреть полностью</Text>
+                </Pressable>
               </View>
             );
           }}
@@ -249,36 +206,6 @@ export default function StaffPanelScreen(_props: Props) {
         <AdminUserManagement tabBarInset={tabBarHeight + spacing.lg} />
       )}
 
-      <Modal visible={!!rejectModal} transparent animationType="fade">
-        <View style={styles.modalBg}>
-          <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Причина отклонения</Text>
-            <Text style={styles.modalHint}>Необязательно, видно автору объявления</Text>
-            <TextInput
-              value={rejectReason}
-              onChangeText={setRejectReason}
-              placeholder="Кратко укажите причину…"
-              placeholderTextColor={colors.textMuted}
-              style={styles.modalInput}
-              multiline
-            />
-            <View style={styles.modalRow}>
-              <Pressable
-                onPress={() => {
-                  setRejectModal(null);
-                  setRejectReason("");
-                }}
-                style={styles.modalCancel}
-              >
-                <Text style={styles.modalCancelTxt}>Отмена</Text>
-              </Pressable>
-              <Pressable onPress={() => void submitReject()} style={styles.modalDanger}>
-                <Text style={styles.modalDangerTxt}>Отклонить</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -415,6 +342,20 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   btnOkTxt: { fontFamily: fonts.semibold, fontSize: 15, color: colors.bg },
+  btnReview: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    paddingVertical: 12,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentDim,
+  },
+  btnReviewTxt: { fontFamily: fonts.semibold, fontSize: 15, color: colors.accent },
   btnNo: {
     flex: 1,
     flexDirection: "row",

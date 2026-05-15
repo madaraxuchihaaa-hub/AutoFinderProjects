@@ -114,6 +114,24 @@ function fmtEngineMl(ml) {
   return `${(Number(ml) / 1000).toFixed(1)} л`;
 }
 
+function listingParamBits(item) {
+  return [
+    item.year ? `${item.year} г.` : null,
+    label(BODY, item.body_type),
+    label(TRANS, item.transmission),
+    label(FUEL, item.fuel_type),
+    item.drivetrain || null,
+    item.engine_volume_ml ? fmtEngineMl(item.engine_volume_ml) : null,
+    item.trim_level || null,
+    item.color || null,
+  ].filter(Boolean);
+}
+
+function engineVolumeLiters(item) {
+  if (item.engine_volume_ml == null || !Number(item.engine_volume_ml)) return "";
+  return String(Number(item.engine_volume_ml) / 1000).replace(/\.0$/, "");
+}
+
 /** Все характеристики как в мобильном приложении. */
 function listingSpecRows(item) {
   const rows = [
@@ -125,21 +143,16 @@ function listingSpecRows(item) {
         ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км`
         : "—",
     ],
-  ];
-  if (item.plate_number) {
-    rows.push(["Госномер", item.plate_number]);
-  }
-  rows.push(
+    ["Комплектация", item.trim_level || "—"],
     ["Топливо", label(FUEL, item.fuel_type)],
     ["КПП", label(TRANS, item.transmission)],
-    ["Кузов", label(BODY, item.body_type)]
-  );
-  if (item.drivetrain) rows.push(["Привод", item.drivetrain]);
-  if (item.engine_volume_ml) {
-    rows.push(["Объём двигателя", fmtEngineMl(item.engine_volume_ml)]);
-  }
-  if (item.color) rows.push(["Цвет", item.color]);
+    ["Кузов", label(BODY, item.body_type)],
+    ["Привод", item.drivetrain || "—"],
+    ["Объём двигателя", item.engine_volume_ml ? fmtEngineMl(item.engine_volume_ml) : "—"],
+    ["Цвет", item.color || "—"],
+  ];
   if (item.vin) rows.push(["VIN", item.vin]);
+  if (item.plate_number) rows.push(["Госномер", item.plate_number]);
   rows.push(["Город", item.city || "—"]);
   return rows;
 }
@@ -229,15 +242,7 @@ function catalogCard(item, opts = {}) {
   const isFav = saved?.isFavorite(item.id);
   const isCmp = saved?.isCompared(item.id);
   const user = getUser();
-  const pBits = [
-    item.year ? `${item.year} г.` : null,
-    label(BODY, item.body_type),
-    label(TRANS, item.transmission),
-    label(FUEL, item.fuel_type),
-    item.drivetrain || null,
-    item.engine_volume_ml ? fmtEngineMl(item.engine_volume_ml) : null,
-    item.trim_level || null,
-  ].filter(Boolean);
+  const pBits = listingParamBits(item);
   const title = item.title || `${item.brand || ""} ${item.model || ""}`.trim();
   const status = STATUS[item.status] || item.status || "—";
   return `
@@ -266,6 +271,13 @@ function catalogCard(item, opts = {}) {
               <strong>${item.mileage_km != null ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км` : "—"}</strong>
             </p>
             <p class="catalog-card__loc">${esc(item.city || "—")}</p>
+            <dl class="catalog-card__specs">${listingSpecRows(item)
+              .slice(0, 6)
+              .map(
+                ([dt, dd]) =>
+                  `<div><dt>${esc(dt)}</dt><dd>${esc(dd)}</dd></div>`
+              )
+              .join("")}</dl>
             ${title ? `<p class="catalog-card__excerpt">${esc(title.slice(0, 90))}</p>` : ""}
           </div>
         </a>
@@ -594,14 +606,11 @@ async function pageListing(id) {
     .map((p) => resolveMediaUrl(p))
     .filter(Boolean);
   const mainSrc = imgs[0] || null;
-  const paramLine = [
-    item.year ? `${item.year} г.` : null,
-    label(BODY, item.body_type),
-    label(TRANS, item.transmission),
-    label(FUEL, item.fuel_type),
-  ]
-    .filter(Boolean)
-    .join(", ");
+  const paramLine = listingParamBits(item).join(", ");
+  const sideSpecs = listingSpecRows(item)
+    .slice(0, 8)
+    .map(([dt, dd]) => `<div class="ls-av__side-spec"><span>${esc(dt)}</span><strong>${esc(dd)}</strong></div>`)
+    .join("");
   const isFav = saved?.isFavorite(item.id);
   const isCmp = saved?.isCompared(item.id);
   const canPhone = item.owner_phone && item.show_phone;
@@ -648,8 +657,8 @@ async function pageListing(id) {
               <div class="ls-av__price-primary"><span class="ls-av__price-value">${esc(fmtByn(item.price_byn).replace(" BYN", ""))}</span><span class="ls-av__price-cur">BYN</span></div>
               <div class="ls-av__price-secondary">${fmtUsd(item.price_byn)}</div>
             </div>
-            <p class="ls-av__params">${esc(paramLine)}, <strong>${item.mileage_km != null ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км` : "—"}</strong></p>
-            <p class="ls-av__sub">${esc(item.year)} г., ${esc(label(TRANS, item.transmission))}, ${esc(label(FUEL, item.fuel_type))}</p>
+            <p class="ls-av__params">${esc(paramLine)}${paramLine ? ", " : ""}<strong>${item.mileage_km != null ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км` : "—"}</strong></p>
+            <div class="ls-av__side-specs">${sideSpecs}</div>
             <div class="ls-av__footer-meta">
               <div class="ls-av__location">${esc(item.city || "—")}</div>
             </div>
@@ -713,20 +722,26 @@ async function pageListing(id) {
   initEquipmentToggle(app);
 }
 
-async function pageCreateListing() {
+async function pageCreateListing(editId) {
   const user = getUser();
   if (!user) {
     location.hash = "#/login";
     return;
   }
+  const isEdit = Boolean(editId);
   const catalog = await loadEquipmentCatalog(api);
   const app = $("#app");
-  document.title = "Новое объявление — AutoFinder";
+  document.title = isEdit ? "Редактировать объявление — AutoFinder" : "Новое объявление — AutoFinder";
+  let initial = null;
+  if (isEdit) {
+    app.innerHTML = `<p class="loading">Загрузка…</p>`;
+    initial = await api(`/api/listings/${encodeURIComponent(editId)}`);
+  }
   app.innerHTML = `
     <section class="hero hero-catalog card">
       <div class="hero-catalog__main">
         <p class="hero-kicker">Продажа</p>
-        <h1>Подать объявление</h1>
+        <h1>${isEdit ? "Редактировать объявление" : "Подать объявление"}</h1>
         <p class="muted">Заполните данные и выберите комплектацию из списка.</p>
       </div>
     </section>
@@ -743,6 +758,10 @@ async function pageCreateListing() {
         <label>Топливо<select name="fuel_type"><option value="">—</option>${Object.entries(FUEL).map(([k,v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
         <label>КПП<select name="transmission"><option value="">—</option>${Object.entries(TRANS).map(([k,v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
         <label>Кузов<select name="body_type"><option value="">—</option>${Object.entries(BODY).map(([k,v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("")}</select></label>
+        <label>Объём двигателя, л<input name="engine_volume_l" type="number" min="0.5" max="10" step="0.1" placeholder="2.0" /></label>
+        <label>Привод<select name="drivetrain"><option value="">—</option>${FILTER_DRIVE.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("")}</select></label>
+        <label>Цвет<input name="color" placeholder="Чёрный" maxlength="60" /></label>
+        <label>VIN<input name="vin" placeholder="17 символов" maxlength="17" /></label>
         <label>Госномер<input name="plate_number" placeholder="1234 AB-7" /></label>
       </div>
       <fieldset class="eq-block">
@@ -753,11 +772,40 @@ async function pageCreateListing() {
       <label class="checkbox-row"><input type="checkbox" name="show_phone" checked /> Показывать телефон в объявлении</label>
       <label>Фото (URL, по одному в строке)<textarea name="image_urls" rows="3" placeholder="https://… или загрузите в приложении"></textarea></label>
       <p class="muted small">Для загрузки с телефона используйте мобильное приложение — ссылки добавятся автоматически.</p>
-      <button type="submit" class="button">Отправить на модерацию</button>
+      <button type="submit" class="button">${isEdit ? "Сохранить" : "Отправить на модерацию"}</button>
     </form>
   `;
   const pickers = $("#equipment-pickers");
-  if (pickers) renderEquipmentPickers(pickers, catalog, esc);
+  if (pickers) {
+    renderEquipmentPickers(pickers, catalog, esc, {
+      trim_level: initial?.trim_level,
+      equipment: initial?.equipment,
+    });
+    if (initial) {
+      const form = $("#create-listing-form");
+      if (form) {
+        form.title.value = initial.title || "";
+        form.brand.value = initial.brand || "";
+        form.model.value = initial.model || "";
+        form.year.value = initial.year ?? "";
+        form.price_byn.value = initial.price_byn ?? "";
+        form.mileage_km.value = initial.mileage_km ?? "";
+        form.city.value = initial.city || "";
+        form.description.value = initial.description || "";
+        form.plate_number.value = initial.plate_number || "";
+        form.show_phone.checked = initial.show_phone !== false;
+        if (initial.fuel_type) form.fuel_type.value = initial.fuel_type;
+        if (initial.transmission) form.transmission.value = initial.transmission;
+        if (initial.body_type) form.body_type.value = initial.body_type;
+        const evL = engineVolumeLiters(initial);
+        if (evL && form.engine_volume_l) form.engine_volume_l.value = evL;
+        if (initial.drivetrain && form.drivetrain) form.drivetrain.value = initial.drivetrain;
+        if (initial.color && form.color) form.color.value = initial.color;
+        if (initial.vin && form.vin) form.vin.value = initial.vin;
+        form.image_urls.value = Array.isArray(initial.images) ? initial.images.join("\n") : "";
+      }
+    }
+  }
   $("#create-listing-form")?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const err = $("#create-err");
@@ -769,9 +817,7 @@ async function pageCreateListing() {
       .filter(Boolean)
       .slice(0, 8);
     try {
-      await api("/api/listings", {
-        method: "POST",
-        body: JSON.stringify({
+      const payload = {
           title: String(fd.get("title") || "").trim(),
           brand: String(fd.get("brand") || "").trim(),
           model: String(fd.get("model") || "").trim(),
@@ -782,14 +828,28 @@ async function pageCreateListing() {
           fuel_type: String(fd.get("fuel_type") || "") || undefined,
           transmission: String(fd.get("transmission") || "") || undefined,
           body_type: String(fd.get("body_type") || "") || undefined,
+          engine_volume_l: fd.get("engine_volume_l") ? Number(fd.get("engine_volume_l")) : undefined,
+          drivetrain: String(fd.get("drivetrain") || "").trim() || undefined,
+          color: String(fd.get("color") || "").trim() || undefined,
+          vin: String(fd.get("vin") || "").trim() || undefined,
           plate_number: String(fd.get("plate_number") || "").trim() || undefined,
           description: String(fd.get("description") || "").trim() || undefined,
           show_phone: fd.get("show_phone") === "on",
           trim_level: eq.trim_level,
           equipment: eq.equipment,
           image_urls,
-        }),
-      });
+      };
+      if (isEdit) {
+        await api(`/api/listings/${encodeURIComponent(editId)}`, {
+          method: "PATCH",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await api("/api/listings", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      }
       location.hash = "#/my-listings";
     } catch (ex) {
       if (err) {
@@ -914,6 +974,9 @@ async function pageCompare() {
     ["Топливо", (i) => label(FUEL, i.fuel_type)],
     ["Коробка", (i) => label(TRANS, i.transmission)],
     ["Кузов", (i) => label(BODY, i.body_type)],
+    ["Привод", (i) => i.drivetrain || "—"],
+    ["Объём", (i) => (i.engine_volume_ml ? fmtEngineMl(i.engine_volume_ml) : "—")],
+    ["Цвет", (i) => i.color || "—"],
     ["Город", (i) => i.city || "—"],
   ];
   app.innerHTML = `
@@ -1096,12 +1159,28 @@ async function pageMyListings() {
           <div class="profile-listing-card__media">${img ? imgTag(img, "", "profile-listing-card__img") : `<div class="placeholder">Нет фото</div>`}</div>
           <div class="profile-listing-card__body">
             <div class="profile-listing-card__head"><div><h2><a href="#/listings/${esc(item.id)}">${esc(item.title || `${item.brand} ${item.model}`)}</a></h2><p class="muted small">${esc(STATUS[item.status] || item.status)}</p></div><div class="profile-listing-card__price">${fmtByn(item.price_byn)}</div></div>
-            <div class="profile-listing-card__actions"><a class="button ghost" href="#/listings/${esc(item.id)}">Открыть</a></div>
+            <div class="profile-listing-card__actions">
+              <a class="button ghost" href="#/listings/${esc(item.id)}">Открыть</a>
+              <a class="button ghost" href="#/create?edit=${esc(item.id)}">Изменить</a>
+              <button type="button" class="button ghost danger-outline" data-delete-listing="${esc(item.id)}">Удалить</button>
+            </div>
           </div>
         </article>`;
       }).join("") : '<p class="empty">У вас пока нет объявлений.</p>'}
     </div>
   `;
+  app.querySelectorAll("[data-delete-listing]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-delete-listing");
+      if (!id || !confirm("Удалить объявление?")) return;
+      try {
+        await api(`/api/listings/${encodeURIComponent(id)}`, { method: "DELETE" });
+        await pageMyListings();
+      } catch (err) {
+        alert(err.message || "Не удалось удалить");
+      }
+    });
+  });
 }
 
 async function router() {
@@ -1143,7 +1222,7 @@ async function router() {
         await pageMyListings();
         break;
       case "create-listing":
-        await pageCreateListing();
+        await pageCreateListing(route.query.edit);
         break;
       default:
         await pageListings(route.query);

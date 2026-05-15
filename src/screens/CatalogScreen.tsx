@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Platform,
@@ -13,7 +14,7 @@ import {
 import { CommonActions, useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { apiGet, resolveMediaUrl } from "../api/client";
+import { apiDelete, apiGet, resolveMediaUrl } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
 import type { ListingRow } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
@@ -123,7 +124,32 @@ export default function CatalogScreen({ navigation }: Props) {
       }
       renderItem={({ item }) => {
         const uri = resolveMediaUrl(item.images?.[0]);
+
+        function confirmDelete() {
+          Alert.alert("Удалить объявление?", item.title, [
+            { text: "Отмена", style: "cancel" },
+            {
+              text: "Удалить",
+              style: "destructive",
+              onPress: () => {
+                void (async () => {
+                  try {
+                    await apiDelete(`/api/listings/${item.id}`);
+                    await load();
+                  } catch (e) {
+                    Alert.alert(
+                      "Ошибка",
+                      e instanceof Error ? e.message : "Не удалось удалить"
+                    );
+                  }
+                })();
+              },
+            },
+          ]);
+        }
+
         return (
+          <View style={styles.card}>
           <Pressable
             onPress={() =>
               navigation.getParent()?.dispatch(
@@ -133,7 +159,7 @@ export default function CatalogScreen({ navigation }: Props) {
                 })
               )
             }
-            style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]}
+            style={({ pressed }) => [styles.cardMain, pressed && { opacity: 0.92 }]}
           >
             {uri ? (
               <Image source={{ uri }} style={styles.thumb} />
@@ -159,6 +185,25 @@ export default function CatalogScreen({ navigation }: Props) {
               ) : null}
             </View>
           </Pressable>
+          <View style={styles.cardActions}>
+            <Pressable
+              onPress={() =>
+                navigation.getParent()?.dispatch(
+                  CommonActions.navigate({
+                    name: "CreateListing",
+                    params: { listingId: item.id },
+                  })
+                )
+              }
+              style={styles.cardBtn}
+            >
+              <Text style={styles.cardBtnTxt}>Изменить</Text>
+            </Pressable>
+            <Pressable onPress={confirmDelete} style={[styles.cardBtn, styles.cardBtnDanger]}>
+              <Text style={[styles.cardBtnTxt, styles.cardBtnDangerTxt]}>Удалить</Text>
+            </Pressable>
+          </View>
+          </View>
         );
       }}
     />
@@ -180,12 +225,39 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   card: {
-    flexDirection: "row",
     backgroundColor: colors.bgElevated,
     borderRadius: radii.lg,
-    overflow: "hidden",
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    overflow: "hidden",
+  },
+  cardMain: {
+    flexDirection: "row",
+  },
+  cardActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  cardBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radii.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    alignItems: "center",
+  },
+  cardBtnDanger: {
+    borderColor: colors.danger,
+  },
+  cardBtnTxt: {
+    fontFamily: fonts.semibold,
+    fontSize: 14,
+    color: colors.accent,
+  },
+  cardBtnDangerTxt: {
+    color: colors.danger,
   },
   thumb: { width: 112, height: 112 },
   thumbPh: { backgroundColor: colors.surface },

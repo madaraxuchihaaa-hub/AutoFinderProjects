@@ -14,7 +14,8 @@ import {
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CommonActions } from "@react-navigation/native";
 import EquipmentDisplay, { type EquipmentSection } from "../components/EquipmentDisplay";
-import { apiGet, apiPost, resolveMediaUrl } from "../api/client";
+import { apiDelete, apiGet, apiPost, resolveMediaUrl } from "../api/client";
+import { formatEngineMl } from "../utils/listingFormat";
 import { useAuth } from "../auth/AuthContext";
 import { useSavedListings } from "../hooks/useSavedListings";
 import PriceText from "../components/PriceText";
@@ -55,6 +56,10 @@ type ListingDetail = {
   fuel_type: string | null;
   transmission: string | null;
   body_type: string | null;
+  engine_volume_ml?: number | null;
+  drivetrain?: string | null;
+  color?: string | null;
+  vin?: string | null;
   trim_level?: string | null;
   interior?: string | null;
   interior_details?: string | null;
@@ -235,6 +240,51 @@ export default function VehicleDetailScreen({ route, navigation }: Props) {
         ) : null}
         {listing.description ? <Text style={styles.desc}>{listing.description}</Text> : null}
 
+        {isOwner ? (
+          <View style={styles.ownerActions}>
+            <Pressable
+              onPress={() =>
+                navigation.dispatch(
+                  CommonActions.navigate({
+                    name: "CreateListing",
+                    params: { listingId: listing.id },
+                  })
+                )
+              }
+              style={({ pressed }) => [styles.btnOutline, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.btnOutlineTxt}>Редактировать</Text>
+            </Pressable>
+            <Pressable
+              onPress={() =>
+                Alert.alert("Удалить объявление?", listing.title, [
+                  { text: "Отмена", style: "cancel" },
+                  {
+                    text: "Удалить",
+                    style: "destructive",
+                    onPress: () => {
+                      void (async () => {
+                        try {
+                          await apiDelete(`/api/listings/${listing.id}`);
+                          navigation.goBack();
+                        } catch (e) {
+                          Alert.alert(
+                            "Ошибка",
+                            e instanceof Error ? e.message : "Не удалось удалить"
+                          );
+                        }
+                      })();
+                    },
+                  },
+                ])
+              }
+              style={({ pressed }) => [styles.btnOutline, styles.btnDangerOutline, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={[styles.btnOutlineTxt, styles.btnDangerTxt]}>Удалить</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {listing.status === "published" && !isOwner ? (
           <View style={styles.saveRow}>
             <Pressable
@@ -324,9 +374,14 @@ export default function VehicleDetailScreen({ route, navigation }: Props) {
           <Spec k="Год" v={String(listing.year)} />
           <Spec k="Пробег" v={formatKm(listing.mileage_km)} />
           {listing.plate_number ? <Spec k="Госномер" v={listing.plate_number} /> : null}
+          {listing.trim_level ? <Spec k="Комплектация" v={listing.trim_level} /> : null}
           <Spec k="Топливо" v={listing.fuel_type ?? "—"} />
           <Spec k="КПП" v={listing.transmission ?? "—"} />
           <Spec k="Кузов" v={listing.body_type ?? "—"} />
+          <Spec k="Привод" v={listing.drivetrain ?? "—"} />
+          <Spec k="Объём двигателя" v={formatEngineMl(listing.engine_volume_ml)} />
+          <Spec k="Цвет" v={listing.color ?? "—"} />
+          {listing.vin ? <Spec k="VIN" v={listing.vin} /> : null}
           <Spec k="Город" v={listing.city ?? "—"} />
         </View>
       </ScrollView>
@@ -430,6 +485,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.sm,
+  },
+  ownerActions: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    flexDirection: "row",
+    gap: spacing.sm,
+  },
+  btnDangerOutline: {
+    borderColor: colors.danger,
+  },
+  btnDangerTxt: {
+    color: colors.danger,
   },
   actions: {
     marginHorizontal: spacing.lg,

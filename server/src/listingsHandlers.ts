@@ -1,19 +1,13 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
 import { enqueuePublicationQueue } from "./listingQueue.js";
-import { validateBrandModel } from "./vehicleRoutes.js";
-import { validateByPhone, validateByPlate, normalizeByPlate } from "./validation/by.js";
-import {
-  equipmentFromBody,
-  sanitizeEquipmentForDb,
-} from "./equipmentOptions.js";
 import { getPublicOrigin, withNormalizedImagesList } from "./mediaUrls.js";
-
-function parsePriceByn(b: Record<string, unknown>): number {
-  if (b.price_byn !== undefined) return Number(b.price_byn);
-  if (b.price_rub !== undefined) return Number(b.price_rub);
-  return Number.NaN;
-}
+import {
+  parseListingBody,
+  replaceListingImages,
+  statusAfterOwnerEdit,
+  validateListingCatalog,
+} from "./listingWrite.js";
 
 export function registerProtectedListingRoutes(
   app: Express,
@@ -44,50 +38,14 @@ export function registerProtectedListingRoutes(
     const staffPublish = role === "admin" || role === "moderator";
     const initialStatus = staffPublish ? "published" : "moderation";
 
-    const b = req.body as Record<string, unknown>;
-    const title = String(b.title ?? "").trim();
-    const brand = String(b.brand ?? "").trim();
-    const model = String(b.model ?? "").trim();
-    const year = Number(b.year);
-    const price_byn = parsePriceByn(b);
-    const mileage_km =
-      b.mileage_km === undefined || b.mileage_km === ""
-        ? null
-        : Number(b.mileage_km);
-    const city = b.city ? String(b.city).trim() : null;
-    const description = b.description ? String(b.description).trim() : null;
-    const fuel_type = b.fuel_type ? String(b.fuel_type).trim() : null;
-    const transmission = b.transmission ? String(b.transmission).trim() : null;
-    const body_type = b.body_type ? String(b.body_type).trim() : null;
-    const eqParsed = equipmentFromBody(b);
-    const trim_level = eqParsed.trim_level;
-    const interior = eqParsed.interior;
-    const interior_details = eqParsed.interior_details;
-    const safety_systems = eqParsed.safety_systems;
-    const equipment = sanitizeEquipmentForDb(eqParsed.equipment);
-    const show_phone = b.show_phone !== false && b.show_phone !== "false";
-    const plateRaw = b.plate_number ? String(b.plate_number).trim() : null;
-    const image_urls = Array.isArray(b.image_urls)
-      ? (b.image_urls as unknown[]).map((u) => String(u).trim()).filter(Boolean).slice(0, 8)
-      : [];
-
-    if (!title || !brand || !model || !Number.isFinite(year) || year < 1990 || year > 2030) {
-      res.status(400).json({ error: "validation", message: "Проверьте название, марку, модель и год." });
+    const parsed = parseListingBody(req.body as Record<string, unknown>);
+    if (!parsed.ok) {
+      res.status(400).json({ error: "validation", message: parsed.message });
       return;
     }
-    if (!Number.isFinite(price_byn) || price_byn < 1) {
-      res.status(400).json({ error: "validation", message: "Укажите цену в BYN больше 0." });
-      return;
-    }
+    const d = parsed.data;
 
-    const plateErr = validateByPlate(plateRaw);
-    if (plateErr) {
-      res.status(400).json({ error: "validation", message: plateErr });
-      return;
-    }
-    const plate_number = plateRaw ? normalizeByPlate(plateRaw) : null;
-
-    const catalogErr = await validateBrandModel(pool, brand, model);
+    const catalogErr = await validateListingCatalog(pool, d.brand, d.model);
     if (catalogErr) {
       res.status(400).json({ error: "validation", message: catalogErr });
       return;
@@ -99,43 +57,40 @@ export function registerProtectedListingRoutes(
       const ins = await client.query<{ id: string }>(
         `INSERT INTO listings (
            user_id, title, description, brand, model, year, mileage_km, price_byn,
-           fuel_type, transmission, body_type, city, status, source,
+           fuel_type, transmission, body_type, engine_volume_ml, drivetrain, color, vin,
+           city, status, source,
            trim_level, interior, interior_details, safety_systems, equipment, show_phone, plate_number
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'user',$14,$15,$16,$17,$18::jsonb,$19,$20)
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'user',$18,$19,$20,$21,$22::jsonb,$23,$24)
          RETURNING id`,
         [
           userId,
-          title.slice(0, 200),
-          description ? description.slice(0, 4000) : null,
-          brand.slice(0, 80),
-          model.slice(0, 80),
-          year,
-          mileage_km !== null && Number.isFinite(mileage_km) ? Math.max(0, mileage_km) : null,
-          Math.floor(price_byn),
-          fuel_type ? fuel_type.slice(0, 40) : null,
-          transmission ? transmission.slice(0, 40) : null,
-          body_type ? body_type.slice(0, 40) : null,
-          city ? city.slice(0, 80) : null,
+          d.title.slice(0, 200),
+          d.description ? d.description.slice(0, 4000) : null,
+          d.brand.slice(0, 80),
+          d.model.slice(0, 80),
+          d.year,
+          d.mileage_km,
+          Math.floor(d.price_byn),
+          d.fuel_type ? d.fuel_type.slice(0, 40) : null,
+          d.transmission ? d.transmission.slice(0, 40) : null,
+          d.body_type ? d.body_type.slice(0, 40) : null,
+          d.engine_volume_ml,
+          d.drivetrain,
+          d.color,
+          d.vin,
+          d.city ? d.city.slice(0, 80) : null,
           initialStatus,
-          trim_level ? trim_level.slice(0, 120) : null,
-          interior ? interior.slice(0, 120) : null,
-          interior_details ? interior_details.slice(0, 2000) : null,
-          safety_systems ? safety_systems.slice(0, 2000) : null,
-          JSON.stringify(equipment),
-          show_phone,
-          plate_number,
+          d.trim_level ? d.trim_level.slice(0, 120) : null,
+          d.interior ? d.interior.slice(0, 120) : null,
+          d.interior_details ? d.interior_details.slice(0, 2000) : null,
+          d.safety_systems ? d.safety_systems.slice(0, 2000) : null,
+          JSON.stringify(d.equipment),
+          d.show_phone,
+          d.plate_number,
         ]
       );
       const listingId = ins.rows[0].id;
-
-      let order = 0;
-      for (const url of image_urls) {
-        if (url.length > 2000) continue;
-        await client.query(
-          `INSERT INTO listing_images (listing_id, url, sort_order) VALUES ($1,$2,$3)`,
-          [listingId, url, order++]
-        );
-      }
+      await replaceListingImages(client, listingId, d.image_urls);
 
       if (staffPublish) {
         await enqueuePublicationQueue(client, listingId);
@@ -150,6 +105,118 @@ export function registerProtectedListingRoutes(
     } finally {
       client.release();
     }
+  });
+
+  app.patch("/api/listings/:id", requireAuth, async (req, res) => {
+    const listingId = req.params.id;
+    const userId = req.auth!.userId;
+    const role = req.auth!.role;
+    const isStaff = role === "admin" || role === "moderator";
+
+    const parsed = parseListingBody(req.body as Record<string, unknown>);
+    if (!parsed.ok) {
+      res.status(400).json({ error: "validation", message: parsed.message });
+      return;
+    }
+    const d = parsed.data;
+
+    const catalogErr = await validateListingCatalog(pool, d.brand, d.model);
+    if (catalogErr) {
+      res.status(400).json({ error: "validation", message: catalogErr });
+      return;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const cur = await client.query<{ status: string; user_id: string }>(
+        `SELECT status, user_id FROM listings WHERE id = $1 FOR UPDATE`,
+        [listingId]
+      );
+      const row = cur.rows[0];
+      if (!row) {
+        await client.query("ROLLBACK");
+        res.status(404).json({ error: "not_found", message: "Объявление не найдено." });
+        return;
+      }
+      if (row.user_id !== userId && !isStaff) {
+        await client.query("ROLLBACK");
+        res.status(403).json({ error: "forbidden", message: "Нет прав на редактирование." });
+        return;
+      }
+
+      const nextStatus = statusAfterOwnerEdit(row.status, isStaff);
+
+      await client.query(
+        `UPDATE listings SET
+           title = $2, description = $3, brand = $4, model = $5, year = $6,
+           mileage_km = $7, price_byn = $8, fuel_type = $9, transmission = $10,
+           body_type = $11, engine_volume_ml = $12, drivetrain = $13, color = $14, vin = $15,
+           city = $16, status = $17, trim_level = $18,
+           interior = $19, interior_details = $20, safety_systems = $21,
+           equipment = $22::jsonb, show_phone = $23, plate_number = $24,
+           reject_reason = CASE WHEN $17 = 'moderation' AND NOT $25::boolean THEN NULL ELSE reject_reason END,
+           updated_at = NOW()
+         WHERE id = $1`,
+        [
+          listingId,
+          d.title.slice(0, 200),
+          d.description ? d.description.slice(0, 4000) : null,
+          d.brand.slice(0, 80),
+          d.model.slice(0, 80),
+          d.year,
+          d.mileage_km,
+          Math.floor(d.price_byn),
+          d.fuel_type ? d.fuel_type.slice(0, 40) : null,
+          d.transmission ? d.transmission.slice(0, 40) : null,
+          d.body_type ? d.body_type.slice(0, 40) : null,
+          d.engine_volume_ml,
+          d.drivetrain,
+          d.color,
+          d.vin,
+          d.city ? d.city.slice(0, 80) : null,
+          nextStatus,
+          d.trim_level ? d.trim_level.slice(0, 120) : null,
+          d.interior ? d.interior.slice(0, 120) : null,
+          d.interior_details ? d.interior_details.slice(0, 2000) : null,
+          d.safety_systems ? d.safety_systems.slice(0, 2000) : null,
+          JSON.stringify(d.equipment),
+          d.show_phone,
+          d.plate_number,
+          isStaff,
+        ]
+      );
+
+      if (req.body && Object.prototype.hasOwnProperty.call(req.body, "image_urls")) {
+        await replaceListingImages(client, listingId, d.image_urls);
+      }
+
+      await client.query("COMMIT");
+      res.json({ ok: true, id: listingId, status: nextStatus });
+    } catch (e) {
+      await client.query("ROLLBACK");
+      console.error(e);
+      res.status(500).json({ error: "server" });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.delete("/api/listings/:id", requireAuth, async (req, res) => {
+    const listingId = req.params.id;
+    const userId = req.auth!.userId;
+    const role = req.auth!.role;
+    const isStaff = role === "admin" || role === "moderator";
+
+    const { rowCount } = await pool.query(
+      `DELETE FROM listings WHERE id = $1 AND ($2::boolean OR user_id = $3::uuid)`,
+      [listingId, isStaff, userId]
+    );
+    if (!rowCount) {
+      res.status(404).json({ error: "not_found", message: "Объявление не найдено." });
+      return;
+    }
+    res.json({ ok: true, id: listingId });
   });
 
   app.get("/api/queue/jobs", requireAuth, async (req, res) => {

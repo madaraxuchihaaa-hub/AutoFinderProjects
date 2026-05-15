@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import ChatDetailScreen from "../screens/ChatDetailScreen";
 import CompareScreen from "../screens/CompareScreen";
 import CreateListingScreen from "../screens/CreateListingScreen";
+import StaffReviewListingScreen from "../screens/StaffReviewListingScreen";
 import FavoritesScreen from "../screens/FavoritesScreen";
 import LoginScreen from "../screens/LoginScreen";
 import MainTabs from "./MainTabs";
@@ -113,7 +114,17 @@ export default function RootNavigator() {
           <Stack.Screen
             name="CreateListing"
             component={CreateListingScreen}
-            options={({ navigation }) => modalScreenOptions("Новое объявление", navigation)}
+            options={({ navigation, route }) =>
+              modalScreenOptions(
+                route.params?.listingId ? "Редактировать объявление" : "Новое объявление",
+                navigation
+              )
+            }
+          />
+          <Stack.Screen
+            name="StaffReviewListing"
+            component={StaffReviewListingScreen}
+            options={({ navigation }) => modalScreenOptions("Проверка заявки", navigation)}
           />
           <Stack.Screen
             name="ChatDetail"

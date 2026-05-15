@@ -1,5 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
+import { resolveListingEquipment } from "./equipmentOptions.js";
+import { getPublicOrigin, withNormalizedImages } from "./mediaUrls.js";
 import { enqueuePublicationQueue } from "./listingQueue.js";
 export function registerStaffRoutes(
   app: Express,
@@ -7,10 +9,13 @@ export function registerStaffRoutes(
   requireAuth: RequestHandler,
   requireStaff: RequestHandler
 ): void {
-  app.get("/api/staff/pending-listings", requireAuth, requireStaff, async (_req, res) => {
+  app.get("/api/staff/pending-listings", requireAuth, requireStaff, async (req, res) => {
+    const origin = getPublicOrigin(req);
     const { rows } = await pool.query(
       `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_byn, l.city, l.description,
-              l.status, l.created_at, u.email AS owner_email, u.id AS owner_id,
+              l.status, l.created_at, l.fuel_type, l.transmission, l.body_type, l.trim_level,
+              l.plate_number, l.show_phone,
+              u.email AS owner_email, u.full_name AS owner_name, u.id AS owner_id,
               COALESCE(
                 (SELECT json_agg(url ORDER BY sort_order)
                  FROM listing_images li WHERE li.listing_id = l.id),
@@ -21,7 +26,49 @@ export function registerStaffRoutes(
        WHERE l.status = 'moderation'
        ORDER BY l.created_at ASC`
     );
-    res.json(rows);
+    res.json(
+      rows.map((row) => {
+        const normalized = withNormalizedImages(row, origin);
+        const resolved = resolveListingEquipment(normalized);
+        return {
+          ...normalized,
+          equipment: resolved.equipment,
+          equipment_sections: resolved.sections,
+        };
+      })
+    );
+  });
+
+  app.get("/api/staff/pending-listings/:id", requireAuth, requireStaff, async (req, res) => {
+    const id = req.params.id;
+    const origin = getPublicOrigin(req);
+    const { rows } = await pool.query(
+      `SELECT l.*,
+              u.id AS owner_id,
+              u.email AS owner_email,
+              u.full_name AS owner_name,
+              u.phone AS owner_phone,
+              COALESCE(
+                (SELECT json_agg(url ORDER BY sort_order)
+                 FROM listing_images li WHERE li.listing_id = l.id),
+                '[]'::json
+              ) AS images
+       FROM listings l
+       JOIN users u ON u.id = l.user_id
+       WHERE l.id = $1 AND l.status = 'moderation'`,
+      [id]
+    );
+    if (!rows[0]) {
+      res.status(404).json({ error: "not_found", message: "Заявка не найдена или уже обработана." });
+      return;
+    }
+    const row = withNormalizedImages(rows[0], origin);
+    const resolved = resolveListingEquipment(row);
+    res.json({
+      ...row,
+      equipment: resolved.equipment,
+      equipment_sections: resolved.sections,
+    });
   });
 
   app.post("/api/staff/pending-listings/:id/approve", requireAuth, requireStaff, async (req, res) => {

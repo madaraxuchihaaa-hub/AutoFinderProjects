@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -20,18 +20,45 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../auth/AuthContext";
 import VehicleAutocomplete, { validateBrandModelChoice } from "../components/VehicleAutocomplete";
 import EquipmentPickers, { type EquipmentMap } from "../components/EquipmentPickers";
-import { apiPost, apiUploadImages } from "../api/client";
+import { apiGet, apiPatch, apiPost, apiUploadImages } from "../api/client";
 import type { RootStackParamList } from "../navigation/types";
 import type { CreateListingResponse } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
+import { engineVolumeLitersFromMl, parseEngineVolumeLiters } from "../utils/listingFormat";
 import { BY_PLATE_HINT, validateByPlate } from "../utils/validation";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateListing">;
 
 const MAX_PHOTOS = 8;
 
-export default function CreateListingScreen({ navigation }: Props) {
+type ListingEditPayload = {
+  title: string;
+  brand: string;
+  model: string;
+  year: number;
+  mileage_km: number | null;
+  price_byn?: string | number;
+  city: string | null;
+  description: string | null;
+  fuel_type: string | null;
+  transmission: string | null;
+  body_type: string | null;
+  engine_volume_ml?: number | null;
+  drivetrain?: string | null;
+  color?: string | null;
+  vin?: string | null;
+  trim_level?: string | null;
+  plate_number?: string | null;
+  show_phone?: boolean;
+  images: string[];
+  equipment?: EquipmentMap;
+};
+
+export default function CreateListingScreen({ navigation, route }: Props) {
   const { user } = useAuth();
+  const listingId = route.params?.listingId;
+  const isEdit = Boolean(listingId);
+  const [loadingListing, setLoadingListing] = useState(isEdit);
   const [title, setTitle] = useState("");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
@@ -43,6 +70,10 @@ export default function CreateListingScreen({ navigation }: Props) {
   const [fuel, setFuel] = useState("");
   const [transmission, setTransmission] = useState("");
   const [body, setBody] = useState("");
+  const [engineVolumeL, setEngineVolumeL] = useState("");
+  const [drivetrain, setDrivetrain] = useState("");
+  const [color, setColor] = useState("");
+  const [vin, setVin] = useState("");
   const [trimLevel, setTrimLevel] = useState("");
   const [equipment, setEquipment] = useState<EquipmentMap>({});
   const [plateNumber, setPlateNumber] = useState("");
@@ -50,6 +81,46 @@ export default function CreateListingScreen({ navigation }: Props) {
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
   const [imagesRaw, setImagesRaw] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!listingId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const row = await apiGet<ListingEditPayload>(`/api/listings/${listingId}`);
+        if (!alive) return;
+        setTitle(row.title ?? "");
+        setBrand(row.brand ?? "");
+        setModel(row.model ?? "");
+        setYear(row.year != null ? String(row.year) : "");
+        const pb = row.price_byn ?? (row as { price_rub?: number }).price_rub;
+        setPrice(pb != null ? String(pb) : "");
+        setMileage(row.mileage_km != null ? String(row.mileage_km) : "");
+        setCity(row.city ?? "");
+        setDescription(row.description ?? "");
+        setFuel(row.fuel_type ?? "");
+        setTransmission(row.transmission ?? "");
+        setBody(row.body_type ?? "");
+        setEngineVolumeL(engineVolumeLitersFromMl(row.engine_volume_ml));
+        setDrivetrain(row.drivetrain ?? "");
+        setColor(row.color ?? "");
+        setVin(row.vin ?? "");
+        setTrimLevel(row.trim_level ?? "");
+        setEquipment(row.equipment ?? {});
+        setPlateNumber(row.plate_number ?? "");
+        setShowPhone(row.show_phone !== false);
+        setImagesRaw((row.images ?? []).join("\n"));
+      } catch (e) {
+        Alert.alert("Ошибка", e instanceof Error ? e.message : "Не удалось загрузить");
+        navigation.goBack();
+      } finally {
+        if (alive) setLoadingListing(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [listingId, navigation]);
 
   async function pickPhotos() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -116,7 +187,7 @@ export default function CreateListingScreen({ navigation }: Props) {
         uploaded = await apiUploadImages(localPhotos);
       }
       const image_urls = [...uploaded, ...urlFromText].slice(0, MAX_PHOTOS);
-      const res = await apiPost<CreateListingResponse>("/api/listings", {
+      const payload = {
         title: title.trim(),
         brand: b,
         model: m,
@@ -131,14 +202,24 @@ export default function CreateListingScreen({ navigation }: Props) {
         fuel_type: fuel.trim() || undefined,
         transmission: transmission.trim() || undefined,
         body_type: body.trim() || undefined,
+        engine_volume_l: parseEngineVolumeLiters(engineVolumeL),
+        drivetrain: drivetrain.trim() || undefined,
+        color: color.trim() || undefined,
+        vin: vin.trim() || undefined,
         trim_level: trimLevel.trim() || undefined,
         equipment,
         plate_number: plateNumber.trim() || undefined,
         show_phone: showPhone,
         image_urls,
-      });
-      const msg =
-        res.status === "moderation"
+      };
+      const res = isEdit
+        ? await apiPatch<CreateListingResponse>(`/api/listings/${listingId}`, payload)
+        : await apiPost<CreateListingResponse>("/api/listings", payload);
+      const msg = isEdit
+        ? res.status === "moderation"
+          ? "Изменения сохранены. Объявление снова на модерации."
+          : "Изменения сохранены."
+        : res.status === "moderation"
           ? "Объявление отправлено на проверку. После одобрения модератором оно появится в каталоге и в очереди публикаций."
           : "Объявление опубликовано.";
       Alert.alert("Готово", msg, [
@@ -157,6 +238,14 @@ export default function CreateListingScreen({ navigation }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  if (loadingListing) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
   }
 
   return (
@@ -215,6 +304,20 @@ export default function CreateListingScreen({ navigation }: Props) {
           <FieldSmall label="КПП" value={transmission} onChangeText={setTransmission} ph="Автомат" />
         </Row>
         <Field label="Кузов" value={body} onChangeText={setBody} ph="Седан" />
+        <Row>
+          <FieldSmall
+            label="Объём, л"
+            value={engineVolumeL}
+            onChangeText={setEngineVolumeL}
+            ph="2.0"
+            keyboard="numeric"
+          />
+          <FieldSmall label="Привод" value={drivetrain} onChangeText={setDrivetrain} ph="Полный" />
+        </Row>
+        <Row>
+          <FieldSmall label="Цвет" value={color} onChangeText={setColor} ph="Чёрный" />
+          <FieldSmall label="VIN" value={vin} onChangeText={setVin} ph="17 символов" />
+        </Row>
         <View style={styles.switchRow}>
           <Text style={styles.switchLabel}>Показывать телефон в объявлении</Text>
           <Switch
@@ -269,7 +372,9 @@ export default function CreateListingScreen({ navigation }: Props) {
             {busy ? (
               <ActivityIndicator color={colors.bg} />
             ) : (
-              <Text style={styles.ctaText}>Опубликовать и в очередь</Text>
+              <Text style={styles.ctaText}>
+                {isEdit ? "Сохранить изменения" : "Опубликовать и в очередь"}
+              </Text>
             )}
           </LinearGradient>
         </Pressable>
@@ -343,6 +448,12 @@ function Row({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.bg,
+  },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xl * 3 },
   hint2: {
     fontFamily: fonts.medium,
