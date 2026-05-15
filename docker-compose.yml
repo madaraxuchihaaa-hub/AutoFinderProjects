@@ -1,8 +1,8 @@
-# Полный стек: PostgreSQL + API + статический web (Expo) за nginx.
+# Полный стек: PostgreSQL + API (веб-интерфейс в server/public на том же порту).
 #
 # Запуск: docker compose up --build
 #   или с файлом переменных: docker compose --env-file .env.docker up --build
-# Web: http://localhost:8080  ·  API напрямую: http://localhost:3000
+# Сайт и API: http://localhost:3000  (веб + /api/…)
 #
 # Для телефона/эмулятора задайте EXPO_PUBLIC_API_URL=http://<IP_ПК>:3000 при локальном npm start.
 services:
@@ -45,19 +45,6 @@ services:
       timeout: 5s
       retries: 12
       start_period: 25s
-
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile.web
-      args:
-        EXPO_PUBLIC_API_URL: ""
-    restart: unless-stopped
-    ports:
-      - "${WEB_PORT:-8080}:80"
-    depends_on:
-      api:
-        condition: service_healthy
 
 volumes:
   postgres_data:

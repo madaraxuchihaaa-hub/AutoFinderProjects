@@ -12,7 +12,6 @@ type Props = {
   onNavigateProfile: () => void;
   onNavigateStaff: () => void;
   onNavigateCreate: () => void;
-  onNavigatePlatforms: () => void;
   onNavigateSettings: () => void;
 };
 
@@ -23,7 +22,6 @@ export default function AppMenuSheet({
   onNavigateProfile,
   onNavigateStaff,
   onNavigateCreate,
-  onNavigatePlatforms,
   onNavigateSettings,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -40,7 +38,6 @@ export default function AppMenuSheet({
         <Text style={styles.title}>{t("tabMenu")}</Text>
         <MenuRow icon="car-sport" label={t("menuGarage")} onPress={onNavigateGarage} styles={styles} />
         <MenuRow icon="add-circle-outline" label={t("menuNewListing")} onPress={onNavigateCreate} styles={styles} />
-        <MenuRow icon="share-social-outline" label={t("menuPlatforms")} onPress={onNavigatePlatforms} styles={styles} />
         {staff ? (
           <MenuRow
             icon={user?.role === "admin" ? "speedometer-outline" : "shield-checkmark-outline"}

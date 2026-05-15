@@ -75,10 +75,6 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
           setMenuOpen(false);
           navigation.getParent()?.dispatch(CommonActions.navigate({ name: "CreateListing" }));
         }}
-        onNavigatePlatforms={() => {
-          setMenuOpen(false);
-          navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Platforms" }));
-        }}
         onNavigateSettings={() => {
           setMenuOpen(false);
           navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Settings" }));

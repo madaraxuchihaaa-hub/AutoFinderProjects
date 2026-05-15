@@ -39,7 +39,7 @@ function goVehicle(
     );
 }
 
-function goModal(navigation: Props["navigation"], name: "Platforms" | "CreateListing") {
+function goModal(navigation: Props["navigation"], name: "CreateListing") {
   navigation.getParent()?.dispatch(CommonActions.navigate({ name }));
 }
 
@@ -102,11 +102,11 @@ export default function HomeScreen({ navigation }: Props) {
             <Text style={styles.warnHint}>{errHint}</Text>
           </View>
         ) : null}
-        <View style={styles.statsRow}>
-          <StatBox label="Витрина" value={stats?.aggregated ?? "—"} />
-          <StatBox label="Онлайн" value={stats?.publishedListings ?? "—"} />
-          <StatBox label="В очереди" value={stats?.queuePending ?? "—"} />
-        </View>
+        <StatsOverview
+          stats={stats}
+          onPressListings={() => navigation.navigate("Listings")}
+          onPressGarage={() => navigation.navigate("Garage")}
+        />
       </LinearGradient>
 
       <View style={styles.section}>
@@ -126,11 +126,6 @@ export default function HomeScreen({ navigation }: Props) {
             icon="add-circle-outline"
             title="Новое объявление"
             onPress={() => goModal(navigation, "CreateListing")}
-          />
-          <ActionRow
-            icon="share-social-outline"
-            title="Площадки"
-            onPress={() => goModal(navigation, "Platforms")}
           />
         </View>
       </View>
@@ -181,11 +176,65 @@ export default function HomeScreen({ navigation }: Props) {
   );
 }
 
-function StatBox({ label, value }: { label: string; value: string | number }) {
+function StatsOverview({
+  stats,
+  onPressListings,
+  onPressGarage,
+}: {
+  stats: StatsResponse | null;
+  onPressListings: () => void;
+  onPressGarage: () => void;
+}) {
+  const items = [
+    {
+      key: "listings",
+      icon: "newspaper-outline" as const,
+      value: stats?.publishedListings ?? "—",
+      label: "Опубликовано",
+      hint: "активные объявления",
+      onPress: onPressListings,
+    },
+    {
+      key: "queue",
+      icon: "time-outline" as const,
+      value: stats?.queuePending ?? "—",
+      label: "На проверке",
+      hint: "ожидают модерации",
+      onPress: onPressGarage,
+    },
+    {
+      key: "feed",
+      icon: "layers-outline" as const,
+      value: stats?.aggregated ?? "—",
+      label: "В ленте",
+      hint: "всего в каталоге",
+      onPress: onPressListings,
+    },
+  ];
+
   return (
-    <View style={styles.statBox}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.statsPanel}>
+      <Text style={styles.statsPanelTitle}>Сводка</Text>
+      <View style={styles.statsGrid}>
+        {items.map((item, index) => (
+          <Pressable
+            key={item.key}
+            onPress={item.onPress}
+            style={({ pressed }) => [
+              styles.statCard,
+              index < items.length - 1 && styles.statCardBorder,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <View style={styles.statIconWrap}>
+              <Ionicons name={item.icon} size={20} color={colors.accent} />
+            </View>
+            <Text style={styles.statValue}>{item.value}</Text>
+            <Text style={styles.statLabel}>{item.label}</Text>
+            <Text style={styles.statHint}>{item.hint}</Text>
+          </Pressable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -255,30 +304,65 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 17,
   },
-  statsRow: {
-    flexDirection: "row",
-    gap: spacing.sm,
+  statsPanel: {
     marginTop: spacing.lg,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.04)",
-    borderRadius: radii.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.bgElevated,
+    borderRadius: radii.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
+    overflow: "hidden",
+  },
+  statsPanelTitle: {
+    fontFamily: fonts.semibold,
+    fontSize: 13,
+    color: colors.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  statsGrid: {
+    flexDirection: "row",
+  },
+  statCard: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    alignItems: "center",
+  },
+  statCardBorder: {
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: colors.border,
+  },
+  statIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.accentDim,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.sm,
   },
   statValue: {
     fontFamily: fonts.bold,
-    fontSize: 19,
-    color: colors.accent,
+    fontSize: 22,
+    color: colors.text,
+    letterSpacing: -0.5,
   },
   statLabel: {
-    marginTop: 4,
+    marginTop: 2,
+    fontFamily: fonts.semibold,
+    fontSize: 12,
+    color: colors.accent,
+    textAlign: "center",
+  },
+  statHint: {
+    marginTop: 2,
     fontFamily: fonts.regular,
-    fontSize: 11,
+    fontSize: 10,
     color: colors.textMuted,
+    textAlign: "center",
   },
   section: {
     paddingHorizontal: spacing.lg,

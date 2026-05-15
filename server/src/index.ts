@@ -16,6 +16,7 @@ import { runMigrations } from "./db/runMigrations.js";
 import { seedCarCatalogIfNeeded } from "./seedCarCatalog.js";
 import { registerUploadRoutes } from "./uploadRoutes.js";
 import { registerVehicleRoutes } from "./vehicleRoutes.js";
+import { hasWebBuild, registerWeb } from "./serveWeb.js";
 
 dotenv.config();
 
@@ -193,6 +194,8 @@ registerAdminUserRoutes(app, pool, requireAuth, requireAdmin);
 registerChatRoutes(app, pool, requireAuth);
 registerStaffRoutes(app, pool, requireAuth, requireStaff);
 
+registerWeb(app);
+
 const port = Number(process.env.PORT ?? 3000);
 
 async function main() {
@@ -200,7 +203,8 @@ async function main() {
   await runMigrations(pool);
   await seedCarCatalogIfNeeded(pool);
   app.listen(port, () => {
-    console.info(`AutoFinder API → http://localhost:${port}`);
+    const web = hasWebBuild() ? " · web" : "";
+    console.info(`AutoFinder → http://localhost:${port}${web}  (API: /api/…)`);
   });
 }
 

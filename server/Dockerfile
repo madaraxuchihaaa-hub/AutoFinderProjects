@@ -10,6 +10,7 @@ RUN npm ci --omit=dev
 
 COPY migrations ./migrations
 COPY data ./data
+COPY public ./public
 COPY src ./src
 COPY tsconfig.json ./
 
