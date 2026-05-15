@@ -4,6 +4,7 @@ const dict = {
   ru: {
     tabHome: "Главная",
     tabMarket: "Рынок",
+    tabChats: "Чаты",
     tabMenu: "Меню",
     menuGarage: "Гараж",
     menuProfile: "Профиль",
@@ -27,6 +28,7 @@ const dict = {
   en: {
     tabHome: "Home",
     tabMarket: "Market",
+    tabChats: "Chats",
     tabMenu: "Menu",
     menuGarage: "Garage",
     menuProfile: "Profile",

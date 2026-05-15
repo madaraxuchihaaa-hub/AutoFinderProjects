@@ -7,6 +7,8 @@ import { registerAuthRoutes } from "./auth/routes.js";
 import { optionalAuth, requireAdmin, requireAuth, requireStaff } from "./auth/middleware.js";
 import { registerProtectedListingRoutes } from "./listingsHandlers.js";
 import { registerAdminUserRoutes } from "./adminUserRoutes.js";
+import { registerChatRoutes } from "./chatRoutes.js";
+import { getUsdPerByn, bynToUsd } from "./exchangeRates.js";
 import { registerStaffRoutes } from "./staffRoutes.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
@@ -40,6 +42,15 @@ app.get("/api/stats", async (_req, res) => {
   });
 });
 
+app.get("/api/exchange-rates", async (_req, res) => {
+  const usdPerByn = await getUsdPerByn();
+  res.json({
+    usdPerByn,
+    source: "nbrb",
+    example: { byn: 10000, usd: Math.round(bynToUsd(10000, usdPerByn) * 100) / 100 },
+  });
+});
+
 app.get("/health", async (_req, res) => {
   try {
     await pool.query("SELECT 1");
@@ -62,7 +73,7 @@ app.get("/api/aggregated", async (req, res) => {
   if (q) {
     const pattern = `%${q}%`;
     const { rows } = await pool.query(
-      `SELECT id, title, brand, model, year, mileage_km, price_rub, city, image_urls, fetched_at
+      `SELECT id, title, brand, model, year, mileage_km, price_byn, city, image_urls, fetched_at
        FROM aggregated_listings
        WHERE title ILIKE $1 OR brand ILIKE $1 OR model ILIKE $1 OR city ILIKE $1
        ORDER BY fetched_at DESC
@@ -73,7 +84,7 @@ app.get("/api/aggregated", async (req, res) => {
     return;
   }
   const { rows } = await pool.query(
-    `SELECT id, title, brand, model, year, mileage_km, price_rub, city, image_urls, fetched_at
+    `SELECT id, title, brand, model, year, mileage_km, price_byn, city, image_urls, fetched_at
      FROM aggregated_listings
      ORDER BY fetched_at DESC
      LIMIT $1`,
@@ -84,7 +95,7 @@ app.get("/api/aggregated", async (req, res) => {
 
 app.get("/api/aggregated/:id", async (req, res) => {
   const { rows } = await pool.query(
-    `SELECT id, feed_id, external_id, title, brand, model, year, mileage_km, price_rub, city, image_urls, raw_json, fetched_at
+    `SELECT id, feed_id, external_id, title, brand, model, year, mileage_km, price_byn, city, image_urls, raw_json, fetched_at
      FROM aggregated_listings WHERE id = $1`,
     [req.params.id]
   );
@@ -98,7 +109,7 @@ app.get("/api/aggregated/:id", async (req, res) => {
 app.get("/api/listings", async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 30, 100);
   const { rows } = await pool.query(
-    `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_rub, l.city, l.status, l.created_at,
+    `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_byn, l.city, l.status, l.created_at,
             COALESCE(
               (SELECT json_agg(url ORDER BY sort_order)
                FROM listing_images li WHERE li.listing_id = l.id),
@@ -121,12 +132,20 @@ app.get("/api/listings/:id", optionalAuth, async (req, res) => {
 
   const { rows } = await pool.query(
     `SELECT l.*,
+            u.id AS owner_id,
+            u.full_name AS owner_name,
+            CASE
+              WHEN l.user_id = $2::uuid THEN u.phone
+              WHEN l.show_phone AND l.status = 'published' THEN u.phone
+              ELSE NULL
+            END AS owner_phone,
             COALESCE(
               (SELECT json_agg(url ORDER BY sort_order)
                FROM listing_images li WHERE li.listing_id = l.id),
               '[]'::json
             ) AS images
      FROM listings l
+     JOIN users u ON u.id = l.user_id
      WHERE l.id = $1
        AND (
          l.status = 'published'
@@ -156,6 +175,7 @@ registerUploadRoutes(app, requireAuth);
 registerAuthRoutes(app, pool);
 registerProtectedListingRoutes(app, pool, requireAuth);
 registerAdminUserRoutes(app, pool, requireAuth, requireAdmin);
+registerChatRoutes(app, pool, requireAuth);
 registerStaffRoutes(app, pool, requireAuth, requireStaff);
 
 const port = Number(process.env.PORT ?? 3000);

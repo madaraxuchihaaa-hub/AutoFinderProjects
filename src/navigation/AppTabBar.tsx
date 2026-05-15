@@ -42,6 +42,13 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
           colors={colors}
         />
         <TabBtn
+          active={activeRoute === "Chats"}
+          label={t("tabChats")}
+          icon="chatbubbles-outline"
+          onPress={() => go("Chats")}
+          colors={colors}
+        />
+        <TabBtn
           active={menuOpen}
           label={t("tabMenu")}
           icon="menu"

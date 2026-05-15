@@ -5,7 +5,9 @@ export type AggregatedRow = {
   model: string | null;
   year: number | null;
   mileage_km: number | null;
-  price_rub: string | number | null;
+  price_byn?: string | number | null;
+  /** @deprecated */
+  price_rub?: string | number | null;
   city: string | null;
   image_urls: string[] | null;
   fetched_at?: string;
@@ -18,11 +20,14 @@ export type ListingRow = {
   model: string;
   year: number;
   mileage_km: number | null;
-  price_rub: string | number;
+  price_byn?: string | number;
+  price_rub?: string | number;
   city: string | null;
   status: string;
   created_at: string;
   images: string[];
+  show_phone?: boolean;
+  plate_number?: string | null;
 };
 
 export type UserRole = "admin" | "moderator" | "user";
@@ -34,7 +39,8 @@ export type PendingListingRow = {
   model: string;
   year: number;
   mileage_km: number | null;
-  price_rub: string | number;
+  price_byn?: string | number;
+  price_rub?: string | number;
   city: string | null;
   description: string | null;
   status: string;
@@ -97,7 +103,34 @@ export type QueueJobRow = {
   platform_code: string;
   listing_id: string;
   listing_title: string;
-  price_rub: string | number;
+  price_byn?: string | number;
+  price_rub?: string | number;
+};
+
+export type ConversationRow = {
+  id: string;
+  listing_id: string;
+  buyer_id: string;
+  seller_id: string;
+  updated_at: string;
+  listing_title: string;
+  listing_brand: string;
+  listing_model: string;
+  peer_email: string;
+  peer_name: string | null;
+  last_message: string | null;
+  last_message_at: string | null;
+  last_sender_id: string | null;
+};
+
+export type MessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  sender_email?: string;
+  sender_name?: string | null;
 };
 
 export type CreateListingResponse = {
@@ -110,8 +143,17 @@ export type AuthUser = {
   email: string;
   full_name: string | null;
   phone: string | null;
+  plate_number?: string | null;
   role: UserRole;
 };
+
+/** Цена из API (поддержка старого поля price_rub). */
+export function readPriceByn(row: {
+  price_byn?: string | number | null;
+  price_rub?: string | number | null;
+}): string | number | null {
+  return row.price_byn ?? row.price_rub ?? null;
+}
 
 export type LoginResponse = {
   accessToken: string;

@@ -1,0 +1,162 @@
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Platform,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
+import { CommonActions } from "@react-navigation/native";
+import { apiGet } from "../api/client";
+import type { MainTabParamList } from "../navigation/types";
+import type { ConversationRow } from "../types/api";
+import { colors, fonts, radii, spacing } from "../theme";
+
+type Props = BottomTabScreenProps<MainTabParamList, "Chats">;
+
+export default function ChatsScreen({ navigation }: Props) {
+  const tabBarHeight = useBottomTabBarHeight();
+  const [items, setItems] = useState<ConversationRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async () => {
+    const data = await apiGet<ConversationRow[]>("/api/conversations");
+    setItems(data);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        setLoading(true);
+        try {
+          await load();
+        } finally {
+          if (alive) setLoading(false);
+        }
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [load])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
+  if (loading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  return (
+    <FlatList
+      data={items}
+      keyExtractor={(it) => it.id}
+      contentContainerStyle={[styles.list, { paddingBottom: tabBarHeight + spacing.lg }]}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => void onRefresh()}
+          tintColor={colors.accent}
+          colors={Platform.OS === "android" ? [colors.accent] : undefined}
+        />
+      }
+      ListEmptyComponent={
+        <Text style={styles.empty}>
+          Пока нет переписок. Откройте объявление и нажмите «Написать продавцу».
+        </Text>
+      }
+      renderItem={({ item }) => {
+        const title = item.listing_title || `${item.listing_brand} ${item.listing_model}`;
+        const peer = item.peer_name || item.peer_email;
+        return (
+          <Pressable
+            onPress={() =>
+              navigation.getParent()?.dispatch(
+                CommonActions.navigate({
+                  name: "ChatDetail",
+                  params: {
+                    conversationId: item.id,
+                    title: peer,
+                    listingTitle: title,
+                  },
+                })
+              )
+            }
+            style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]}
+          >
+            <Text style={styles.cardTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={styles.peer}>{peer}</Text>
+            {item.last_message ? (
+              <Text style={styles.preview} numberOfLines={2}>
+                {item.last_message}
+              </Text>
+            ) : (
+              <Text style={styles.previewMuted}>Нет сообщений</Text>
+            )}
+          </Pressable>
+        );
+      }}
+    />
+  );
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, backgroundColor: colors.bg, alignItems: "center", justifyContent: "center" },
+  list: { padding: spacing.lg, gap: spacing.md },
+  empty: {
+    textAlign: "center",
+    marginTop: spacing.xl,
+    fontFamily: fonts.regular,
+    fontSize: 15,
+    color: colors.textMuted,
+    lineHeight: 22,
+  },
+  card: {
+    backgroundColor: colors.bgElevated,
+    borderRadius: radii.lg,
+    padding: spacing.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  cardTitle: { fontFamily: fonts.semibold, fontSize: 16, color: colors.text },
+  peer: {
+    marginTop: 4,
+    fontFamily: fonts.medium,
+    fontSize: 13,
+    color: colors.accent,
+  },
+  preview: {
+    marginTop: spacing.sm,
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    lineHeight: 20,
+  },
+  previewMuted: {
+    marginTop: spacing.sm,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+    fontStyle: "italic",
+  },
+});

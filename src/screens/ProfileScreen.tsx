@@ -18,6 +18,12 @@ import { useAuth } from "../auth/AuthContext";
 import { apiPatch } from "../api/client";
 import type { AuthUser, UserRole } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
+import {
+  BY_PHONE_HINT,
+  BY_PLATE_HINT,
+  validateByPhone,
+  validateByPlate,
+} from "../utils/validation";
 
 function roleLabel(role: UserRole): string {
   if (role === "admin") return "Администратор";
@@ -30,11 +36,13 @@ export default function ProfileScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
+  const [plateNumber, setPlateNumber] = useState("");
   const [saving, setSaving] = useState(false);
 
   const syncFields = useCallback((u: AuthUser | null) => {
     setFullName(u?.full_name ?? "");
     setPhone(u?.phone ?? "");
+    setPlateNumber(u?.plate_number ?? "");
   }, []);
 
   useFocusEffect(
@@ -48,11 +56,22 @@ export default function ProfileScreen() {
   }, [user, syncFields]);
 
   async function saveProfile() {
+    const phoneErr = validateByPhone(phone);
+    if (phoneErr) {
+      Alert.alert("Телефон", phoneErr);
+      return;
+    }
+    const plateErr = validateByPlate(plateNumber);
+    if (plateErr) {
+      Alert.alert("Госномер", plateErr);
+      return;
+    }
     setSaving(true);
     try {
       const updated = await apiPatch<AuthUser>("/api/auth/profile", {
         full_name: fullName.trim() || null,
         phone: phone.trim() || null,
+        plate_number: plateNumber.trim() || null,
       });
       setProfileLocal(updated);
       syncFields(updated);
@@ -109,11 +128,24 @@ export default function ProfileScreen() {
           <TextInput
             value={phone}
             onChangeText={setPhone}
-            placeholder="+7…"
+            placeholder="+375 29 123-45-67"
             placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
             style={styles.input}
           />
+          <Text style={styles.hint}>{BY_PHONE_HINT}</Text>
+        </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>Госномер (необязательно)</Text>
+          <TextInput
+            value={plateNumber}
+            onChangeText={(t) => setPlateNumber(t.toUpperCase())}
+            placeholder="1234 AB-7"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="characters"
+            style={styles.input}
+          />
+          <Text style={styles.hint}>{BY_PLATE_HINT}</Text>
         </View>
         <Pressable
           onPress={() => void saveProfile()}
@@ -177,6 +209,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginBottom: 6,
+  },
+  hint: {
+    marginTop: 6,
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    lineHeight: 15,
+    color: colors.textMuted,
   },
   input: {
     backgroundColor: colors.bgElevated,

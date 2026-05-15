@@ -7,6 +7,7 @@ import { usePreferences } from "../preferences/PreferencesContext";
 import AggregatedScreen from "../screens/AggregatedScreen";
 import CatalogScreen from "../screens/CatalogScreen";
 import HomeScreen from "../screens/HomeScreen";
+import ChatsScreen from "../screens/ChatsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import StaffPanelScreen from "../screens/StaffPanelScreen";
 import AppTabBar, { hiddenTabOptions } from "./AppTabBar";
@@ -48,6 +49,11 @@ export default function MainTabs() {
         options={{ title: "Главная", headerShown: false }}
       />
       <Tab.Screen name="Market" component={AggregatedScreen} options={{ title: "Рынок" }} />
+      <Tab.Screen
+        name="Chats"
+        component={ChatsScreen}
+        options={{ title: "Чаты", ...hiddenTabOptions() }}
+      />
       <Tab.Screen
         name="Garage"
         component={CatalogScreen}

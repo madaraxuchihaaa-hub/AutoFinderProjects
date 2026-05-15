@@ -24,7 +24,9 @@ import { apiGet, apiPost } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
 import type { PendingListingRow } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
-import { formatKm, formatRub } from "../utils/format";
+import PriceText from "../components/PriceText";
+import { readPriceByn } from "../types/api";
+import { formatKm } from "../utils/format";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Staff">;
 type Section = "queue" | "users";
@@ -209,7 +211,7 @@ export default function StaffPanelScreen(_props: Props) {
                     <Text style={styles.meta}>
                       {[item.brand, item.model, item.year].join(" · ")}
                     </Text>
-                    <Text style={styles.price}>{formatRub(item.price_rub)}</Text>
+                    <PriceText priceByn={readPriceByn(item)} size="md" />
                     <Text style={styles.km}>{formatKm(item.mileage_km)}</Text>
                   </View>
                 </View>

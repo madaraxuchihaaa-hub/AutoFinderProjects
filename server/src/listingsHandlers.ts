@@ -2,6 +2,13 @@ import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
 import { enqueuePublicationQueue } from "./listingQueue.js";
 import { validateBrandModel } from "./vehicleRoutes.js";
+import { validateByPhone, validateByPlate, normalizeByPlate } from "./validation/by.js";
+
+function parsePriceByn(b: Record<string, unknown>): number {
+  if (b.price_byn !== undefined) return Number(b.price_byn);
+  if (b.price_rub !== undefined) return Number(b.price_rub);
+  return Number.NaN;
+}
 
 export function registerProtectedListingRoutes(
   app: Express,
@@ -10,7 +17,8 @@ export function registerProtectedListingRoutes(
 ): void {
   app.get("/api/me/listings", requireAuth, async (req, res) => {
     const { rows } = await pool.query(
-      `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_rub, l.city, l.status, l.created_at,
+      `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_byn, l.city, l.status, l.created_at,
+              l.show_phone, l.plate_number,
               COALESCE(
                 (SELECT json_agg(url ORDER BY sort_order)
                  FROM listing_images li WHERE li.listing_id = l.id),
@@ -36,7 +44,7 @@ export function registerProtectedListingRoutes(
     const brand = String(b.brand ?? "").trim();
     const model = String(b.model ?? "").trim();
     const year = Number(b.year);
-    const price_rub = Number(b.price_rub);
+    const price_byn = parsePriceByn(b);
     const mileage_km =
       b.mileage_km === undefined || b.mileage_km === ""
         ? null
@@ -46,6 +54,12 @@ export function registerProtectedListingRoutes(
     const fuel_type = b.fuel_type ? String(b.fuel_type).trim() : null;
     const transmission = b.transmission ? String(b.transmission).trim() : null;
     const body_type = b.body_type ? String(b.body_type).trim() : null;
+    const trim_level = b.trim_level ? String(b.trim_level).trim() : null;
+    const interior = b.interior ? String(b.interior).trim() : null;
+    const interior_details = b.interior_details ? String(b.interior_details).trim() : null;
+    const safety_systems = b.safety_systems ? String(b.safety_systems).trim() : null;
+    const show_phone = b.show_phone !== false && b.show_phone !== "false";
+    const plateRaw = b.plate_number ? String(b.plate_number).trim() : null;
     const image_urls = Array.isArray(b.image_urls)
       ? (b.image_urls as unknown[]).map((u) => String(u).trim()).filter(Boolean).slice(0, 8)
       : [];
@@ -54,10 +68,17 @@ export function registerProtectedListingRoutes(
       res.status(400).json({ error: "validation", message: "Проверьте название, марку, модель и год." });
       return;
     }
-    if (!Number.isFinite(price_rub) || price_rub < 1) {
-      res.status(400).json({ error: "validation", message: "Укажите цену больше 0." });
+    if (!Number.isFinite(price_byn) || price_byn < 1) {
+      res.status(400).json({ error: "validation", message: "Укажите цену в BYN больше 0." });
       return;
     }
+
+    const plateErr = validateByPlate(plateRaw);
+    if (plateErr) {
+      res.status(400).json({ error: "validation", message: plateErr });
+      return;
+    }
+    const plate_number = plateRaw ? normalizeByPlate(plateRaw) : null;
 
     const catalogErr = await validateBrandModel(pool, brand, model);
     if (catalogErr) {
@@ -70,9 +91,10 @@ export function registerProtectedListingRoutes(
       await client.query("BEGIN");
       const ins = await client.query<{ id: string }>(
         `INSERT INTO listings (
-           user_id, title, description, brand, model, year, mileage_km, price_rub,
-           fuel_type, transmission, body_type, city, status, source
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'user')
+           user_id, title, description, brand, model, year, mileage_km, price_byn,
+           fuel_type, transmission, body_type, city, status, source,
+           trim_level, interior, interior_details, safety_systems, show_phone, plate_number
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'user',$14,$15,$16,$17,$18,$19)
          RETURNING id`,
         [
           userId,
@@ -82,12 +104,18 @@ export function registerProtectedListingRoutes(
           model.slice(0, 80),
           year,
           mileage_km !== null && Number.isFinite(mileage_km) ? Math.max(0, mileage_km) : null,
-          Math.floor(price_rub),
+          Math.floor(price_byn),
           fuel_type ? fuel_type.slice(0, 40) : null,
           transmission ? transmission.slice(0, 40) : null,
           body_type ? body_type.slice(0, 40) : null,
           city ? city.slice(0, 80) : null,
           initialStatus,
+          trim_level ? trim_level.slice(0, 120) : null,
+          interior ? interior.slice(0, 120) : null,
+          interior_details ? interior_details.slice(0, 2000) : null,
+          safety_systems ? safety_systems.slice(0, 2000) : null,
+          show_phone,
+          plate_number,
         ]
       );
       const listingId = ins.rows[0].id;
@@ -124,7 +152,7 @@ export function registerProtectedListingRoutes(
     const { rows } = await pool.query(
       `SELECT pq.id, pq.status, pq.scheduled_at, pq.attempts, pq.last_error,
               p.name AS platform_name, p.code AS platform_code,
-              l.id AS listing_id, l.title AS listing_title, l.price_rub
+              l.id AS listing_id, l.title AS listing_title, l.price_byn
        FROM publication_queue pq
        JOIN platforms p ON p.id = pq.platform_id
        JOIN listings l ON l.id = pq.listing_id

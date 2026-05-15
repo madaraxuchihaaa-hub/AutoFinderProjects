@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -22,6 +23,7 @@ import { apiPost, apiUploadImages } from "../api/client";
 import type { RootStackParamList } from "../navigation/types";
 import type { CreateListingResponse } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
+import { BY_PLATE_HINT, validateByPlate } from "../utils/validation";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateListing">;
 
@@ -40,6 +42,12 @@ export default function CreateListingScreen({ navigation }: Props) {
   const [fuel, setFuel] = useState("");
   const [transmission, setTransmission] = useState("");
   const [body, setBody] = useState("");
+  const [trimLevel, setTrimLevel] = useState("");
+  const [interior, setInterior] = useState("");
+  const [interiorDetails, setInteriorDetails] = useState("");
+  const [safetySystems, setSafetySystems] = useState("");
+  const [plateNumber, setPlateNumber] = useState("");
+  const [showPhone, setShowPhone] = useState(true);
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
   const [imagesRaw, setImagesRaw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,7 +97,12 @@ export default function CreateListingScreen({ navigation }: Props) {
       return;
     }
     if (!Number.isFinite(p) || p < 1) {
-      Alert.alert("Цена", "Укажите цену в рублях.");
+      Alert.alert("Цена", "Укажите цену в BYN.");
+      return;
+    }
+    const plateErr = validateByPlate(plateNumber);
+    if (plateErr) {
+      Alert.alert("Госномер", plateErr);
       return;
     }
     const urlFromText = imagesRaw
@@ -109,7 +122,7 @@ export default function CreateListingScreen({ navigation }: Props) {
         brand: b,
         model: m,
         year: y,
-        price_rub: Math.round(p),
+        price_byn: Math.round(p),
         mileage_km:
           mileage_km !== undefined && Number.isFinite(mileage_km)
             ? Math.max(0, mileage_km)
@@ -119,6 +132,12 @@ export default function CreateListingScreen({ navigation }: Props) {
         fuel_type: fuel.trim() || undefined,
         transmission: transmission.trim() || undefined,
         body_type: body.trim() || undefined,
+        trim_level: trimLevel.trim() || undefined,
+        interior: interior.trim() || undefined,
+        interior_details: interiorDetails.trim() || undefined,
+        safety_systems: safetySystems.trim() || undefined,
+        plate_number: plateNumber.trim() || undefined,
+        show_phone: showPhone,
         image_urls,
       });
       const msg =
@@ -178,18 +197,45 @@ export default function CreateListingScreen({ navigation }: Props) {
         />
         <Row>
           <FieldSmall label="Год" value={year} onChangeText={setYear} ph="2020" keyboard="numeric" />
-          <FieldSmall label="Цена, ₽" value={price} onChangeText={setPrice} ph="2500000" keyboard="numeric" />
+          <FieldSmall label="Цена, BYN" value={price} onChangeText={setPrice} ph="45000" keyboard="numeric" />
         </Row>
+        <Text style={styles.hintPrice}>Курс USD подставится автоматически в карточке.</Text>
         <Row>
           <FieldSmall label="Пробег, км" value={mileage} onChangeText={setMileage} ph="45000" keyboard="numeric" />
-          <FieldSmall label="Город" value={city} onChangeText={setCity} ph="Москва" />
+          <FieldSmall label="Город" value={city} onChangeText={setCity} ph="Минск" />
         </Row>
-        <Field label="Описание" value={description} onChangeText={setDescription} ph="Комплектация, история…" multiline />
+        <Field label="Госномер (необязательно)" value={plateNumber} onChangeText={setPlateNumber} ph="1234 AB-7" />
+        <Text style={styles.fieldHint}>{BY_PLATE_HINT}</Text>
+        <Field label="Комплектация" value={trimLevel} onChangeText={setTrimLevel} ph="Comfort, M Sport…" />
+        <Field label="Салон" value={interior} onChangeText={setInterior} ph="Кожа, ткань, комбинированный…" />
+        <Field
+          label="Характеристики салона"
+          value={interiorDetails}
+          onChangeText={setInteriorDetails}
+          ph="Подогрев сидений, электрорегулировка, климат…"
+          multiline
+        />
+        <Field
+          label="Системы безопасности"
+          value={safetySystems}
+          onChangeText={setSafetySystems}
+          ph={"ABS, ESP, Isofix, антипробуксовочная,\nблокировка задних дверей, TPMS,\nэкстренное торможение, подушки…"}
+          multiline
+        />
+        <Field label="Описание" value={description} onChangeText={setDescription} ph="История, состояние…" multiline />
         <Row>
           <FieldSmall label="Топливо" value={fuel} onChangeText={setFuel} ph="Бензин" />
           <FieldSmall label="КПП" value={transmission} onChangeText={setTransmission} ph="Автомат" />
         </Row>
         <Field label="Кузов" value={body} onChangeText={setBody} ph="Седан" />
+        <View style={styles.switchRow}>
+          <Text style={styles.switchLabel}>Показывать телефон в объявлении</Text>
+          <Switch
+            value={showPhone}
+            onValueChange={setShowPhone}
+            trackColor={{ false: colors.border, true: colors.accent }}
+          />
+        </View>
 
         <Text style={styles.label}>Фото</Text>
         <Pressable
@@ -317,6 +363,34 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: colors.accent,
     marginBottom: spacing.lg,
+  },
+  hintPrice: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
+  fieldHint: {
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: -spacing.sm,
+    marginBottom: spacing.md,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  switchLabel: {
+    flex: 1,
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.text,
+    marginRight: spacing.md,
   },
   field: { marginBottom: spacing.md },
   fieldGrow: { flex: 1, minWidth: 0 },

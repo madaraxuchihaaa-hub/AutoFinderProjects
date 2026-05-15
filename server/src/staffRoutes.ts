@@ -9,7 +9,7 @@ export function registerStaffRoutes(
 ): void {
   app.get("/api/staff/pending-listings", requireAuth, requireStaff, async (_req, res) => {
     const { rows } = await pool.query(
-      `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_rub, l.city, l.description,
+      `SELECT l.id, l.title, l.brand, l.model, l.year, l.mileage_km, l.price_byn, l.city, l.description,
               l.status, l.created_at, u.email AS owner_email, u.id AS owner_id,
               COALESCE(
                 (SELECT json_agg(url ORDER BY sort_order)

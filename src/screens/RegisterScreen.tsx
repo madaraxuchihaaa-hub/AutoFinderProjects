@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../auth/AuthContext";
 import type { RootStackParamList } from "../navigation/types";
 import { colors, fonts, radii, spacing } from "../theme";
+import { BY_PHONE_HINT, validateByPhone } from "../utils/validation";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Register">;
 
@@ -31,6 +32,11 @@ export default function RegisterScreen({ navigation }: Props) {
     setErr(null);
     if (password.length < 8) {
       setErr("Пароль не короче 8 символов.");
+      return;
+    }
+    const phoneErr = validateByPhone(phone);
+    if (phone.trim() && phoneErr) {
+      setErr(phoneErr);
       return;
     }
     setBusy(true);
@@ -98,11 +104,12 @@ export default function RegisterScreen({ navigation }: Props) {
           <TextInput
             value={phone}
             onChangeText={setPhone}
-            placeholder="+7…"
+            placeholder="+375 29 123-45-67"
             placeholderTextColor={colors.textMuted}
             keyboardType="phone-pad"
             style={styles.input}
           />
+          <Text style={styles.hint}>{BY_PHONE_HINT}</Text>
         </View>
         <Pressable onPress={onSubmit} disabled={busy} style={({ pressed }) => [pressed && { opacity: 0.92 }]}>
           <LinearGradient
@@ -141,6 +148,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     marginBottom: 6,
+  },
+  hint: {
+    marginTop: 6,
+    fontFamily: fonts.regular,
+    fontSize: 11,
+    lineHeight: 15,
+    color: colors.textMuted,
   },
   input: {
     backgroundColor: colors.bgElevated,

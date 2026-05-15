@@ -4,6 +4,12 @@ import type { Pool } from "pg";
 import { signAccessToken } from "./jwt.js";
 import { requireAuth } from "./middleware.js";
 import type { UserRole, UserRow } from "./types.js";
+import {
+  normalizeByPhone,
+  normalizeByPlate,
+  validateByPhone,
+  validateByPlate,
+} from "../validation/by.js";
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -16,9 +22,7 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
     const full_name = req.body?.full_name
       ? String(req.body.full_name).trim().slice(0, 120)
       : null;
-    const phone = req.body?.phone
-      ? String(req.body.phone).trim().slice(0, 32)
-      : null;
+    const phoneRaw = req.body?.phone ? String(req.body.phone).trim() : null;
 
     if (!email || !email.includes("@")) {
       res.status(400).json({ error: "validation", message: "Укажите корректный email." });
@@ -41,6 +45,13 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
       res.status(400).json({ error: "validation", message: "Этот email зарезервирован." });
       return;
     }
+
+    const phoneErr = validateByPhone(phoneRaw);
+    if (phoneErr) {
+      res.status(400).json({ error: "validation", message: phoneErr });
+      return;
+    }
+    const phone = phoneRaw ? normalizeByPhone(phoneRaw) : null;
 
     const hash = await bcrypt.hash(password, 10);
     try {
@@ -78,7 +89,7 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
     const { rows } = await pool.query<
       UserRow & { password_hash: string; is_blocked?: boolean }
     >(
-      `SELECT id, email, password_hash, full_name, phone, role, created_at, is_blocked
+      `SELECT id, email, password_hash, full_name, phone, plate_number, role, created_at, is_blocked
        FROM users WHERE email = $1`,
       [email]
     );
@@ -109,6 +120,7 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
         email: row.email,
         full_name: row.full_name,
         phone: row.phone,
+        plate_number: row.plate_number,
         role,
       },
     });
@@ -116,7 +128,7 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
 
   app.get("/api/auth/me", requireAuth, async (req, res) => {
     const { rows } = await pool.query<UserRow>(
-      `SELECT id, email, full_name, phone, role, created_at FROM users WHERE id = $1`,
+      `SELECT id, email, full_name, phone, plate_number, role, created_at FROM users WHERE id = $1`,
       [req.auth!.userId]
     );
     if (!rows[0]) {
@@ -129,6 +141,7 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
       email: u.email,
       full_name: u.full_name,
       phone: u.phone,
+      plate_number: u.plate_number,
       role: u.role,
       created_at: u.created_at,
     });
@@ -139,14 +152,33 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
       req.body?.full_name !== undefined
         ? String(req.body.full_name).trim().slice(0, 120) || null
         : undefined;
-    const phone =
+    const phoneRaw =
       req.body?.phone !== undefined
-        ? String(req.body.phone).trim().slice(0, 32) || null
+        ? String(req.body.phone).trim() || null
+        : undefined;
+    const plateRaw =
+      req.body?.plate_number !== undefined
+        ? String(req.body.plate_number).trim() || null
         : undefined;
 
-    if (full_name === undefined && phone === undefined) {
+    if (full_name === undefined && phoneRaw === undefined && plateRaw === undefined) {
       res.status(400).json({ error: "validation", message: "Нет полей для обновления." });
       return;
+    }
+
+    if (phoneRaw !== undefined) {
+      const phoneErr = validateByPhone(phoneRaw);
+      if (phoneErr) {
+        res.status(400).json({ error: "validation", message: phoneErr });
+        return;
+      }
+    }
+    if (plateRaw !== undefined) {
+      const plateErr = validateByPlate(plateRaw);
+      if (plateErr) {
+        res.status(400).json({ error: "validation", message: plateErr });
+        return;
+      }
     }
 
     const sets: string[] = [];
@@ -156,16 +188,20 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
       sets.push(`full_name = $${i++}`);
       vals.push(full_name);
     }
-    if (phone !== undefined) {
+    if (phoneRaw !== undefined) {
       sets.push(`phone = $${i++}`);
-      vals.push(phone);
+      vals.push(phoneRaw ? normalizeByPhone(phoneRaw) : null);
+    }
+    if (plateRaw !== undefined) {
+      sets.push(`plate_number = $${i++}`);
+      vals.push(plateRaw ? normalizeByPlate(plateRaw) : null);
     }
     sets.push(`updated_at = NOW()`);
     vals.push(req.auth!.userId);
 
     const { rows } = await pool.query<UserRow>(
       `UPDATE users SET ${sets.join(", ")} WHERE id = $${i}
-       RETURNING id, email, full_name, phone, role, created_at`,
+       RETURNING id, email, full_name, phone, plate_number, role, created_at`,
       vals
     );
     res.json(rows[0]);

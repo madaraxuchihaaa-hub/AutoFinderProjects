@@ -18,10 +18,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { apiGet } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
 import type { AggregatedRow } from "../types/api";
+import { readPriceByn } from "../types/api";
 import { usePreferences } from "../preferences/PreferencesContext";
 import type { ThemeColors } from "../theme/colors";
 import { fonts, radii, spacing } from "../theme";
-import { formatKm, formatRub } from "../utils/format";
+import PriceText from "../components/PriceText";
+import { formatKm } from "../utils/format";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Market">;
 
@@ -147,7 +149,7 @@ export default function AggregatedScreen({ navigation }: Props) {
                 {[item.brand, item.model, item.year].filter(Boolean).join(" · ")}
               </Text>
               <View style={styles.row}>
-                <Text style={styles.price}>{formatRub(item.price_rub)}</Text>
+                <PriceText priceByn={readPriceByn(item)} size="md" />
                 <Text style={styles.km}>{formatKm(item.mileage_km)}</Text>
               </View>
               {item.city ? (

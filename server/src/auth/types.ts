@@ -11,6 +11,7 @@ export type UserRow = {
   email: string;
   full_name: string | null;
   phone: string | null;
+  plate_number: string | null;
   role: UserRole;
   created_at: string;
 };

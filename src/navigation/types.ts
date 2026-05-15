@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 export type MainTabParamList = {
   Home: undefined;
   Market: undefined;
+  Chats: undefined;
   Garage: undefined;
   Staff: undefined;
   Profile: undefined;
@@ -17,6 +18,11 @@ export type RootStackParamList = {
   CreateListing: undefined;
   Platforms: undefined;
   Settings: undefined;
+  ChatDetail: {
+    conversationId: string;
+    title?: string;
+    listingTitle?: string;
+  };
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =
