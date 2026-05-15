@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CommonActions } from "@react-navigation/native";
-import { apiGet, apiPost } from "../api/client";
+import { apiGet, apiPost, resolveMediaUrl } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { useSavedListings } from "../hooks/useSavedListings";
 import PriceText from "../components/PriceText";
@@ -145,7 +145,9 @@ export default function VehicleDetailScreen({ route, navigation }: Props) {
   }
 
   if (scope === "aggregated" && agg) {
-    const images = agg.image_urls?.length ? agg.image_urls : [];
+    const images = (agg.image_urls ?? [])
+      .map((u) => resolveMediaUrl(u))
+      .filter((u): u is string => Boolean(u));
     return (
       <ScrollView style={styles.root} contentContainerStyle={styles.body}>
         <Gallery images={images} />
@@ -165,7 +167,9 @@ export default function VehicleDetailScreen({ route, navigation }: Props) {
   }
 
   if (scope === "listing" && listing) {
-    const images = listing.images?.length ? listing.images : [];
+    const images = (listing.images ?? [])
+      .map((u) => resolveMediaUrl(u))
+      .filter((u): u is string => Boolean(u));
     const isOwner = user?.id === listing.owner_id;
     const canChat =
       listing.status === "published" && !isOwner && listing.owner_id;

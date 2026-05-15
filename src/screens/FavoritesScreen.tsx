@@ -13,7 +13,7 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CommonActions } from "@react-navigation/native";
-import { apiGet } from "../api/client";
+import { apiGet, resolveMediaUrl } from "../api/client";
 import PriceText from "../components/PriceText";
 import type { RootStackParamList } from "../navigation/types";
 import type { ListingRow } from "../types/api";
@@ -79,7 +79,9 @@ export default function FavoritesScreen({ navigation }: Props) {
         <Text style={styles.empty}>Список избранного пуст. Добавляйте объявления из каталога.</Text>
       }
       renderItem={({ item }) => {
-        const img = Array.isArray(item.images) ? item.images[0] : null;
+        const img = Array.isArray(item.images)
+          ? resolveMediaUrl(item.images[0])
+          : null;
         return (
           <Pressable
             style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]}

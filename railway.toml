@@ -3,7 +3,8 @@
 # Переменные в Railway → Variables:
 #   JWT_SECRET      — случайная строка 32+ символов
 #   DATABASE_URL    — PostgreSQL (или PGHOST/PGUSER/…)
-#   PUBLIC_BASE_URL — https://<ваш-домен> (URL картинок /uploads)
+#   PUBLIC_BASE_URL — https://<ваш-домен> (обязательно https, иначе фото не грузятся)
+#   Том Railway: смонтировать volume на /app/uploads (иначе фото пропадают после деплоя)
 #
 # Быстрее: Settings → Root Directory = server (тогда startCommand = npm start).
 [build]

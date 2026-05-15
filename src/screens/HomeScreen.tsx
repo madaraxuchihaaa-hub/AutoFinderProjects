@@ -17,6 +17,7 @@ import {
   apiGet,
   hasRemoteApiUrl,
   isStandaloneAppWithoutApiEnv,
+  resolveMediaUrl,
 } from "../api/client";
 import type { AggregatedRow, StatsResponse } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
@@ -138,7 +139,7 @@ export default function HomeScreen({ navigation }: Props) {
           contentContainerStyle={styles.hScroll}
         >
           {featured.map((item) => {
-            const uri = item.image_urls?.[0];
+            const uri = resolveMediaUrl(item.image_urls?.[0]);
             return (
               <Pressable
                 key={item.id}

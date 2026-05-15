@@ -1,36 +1,59 @@
 import type { Request } from "express";
 
+function preferHttps(origin: string): string {
+  if (!origin) return origin;
+  if (process.env.FORCE_HTTPS === "0") return origin;
+  return origin.replace(/^http:\/\//i, "https://");
+}
+
+/** Базовый URL сайта (PUBLIC_BASE_URL или прокси Railway). */
 export function getPublicOrigin(req?: Pick<Request, "protocol" | "get">): string {
   const fromEnv = process.env.PUBLIC_BASE_URL?.replace(/\/$/, "");
-  if (fromEnv) return fromEnv;
-  if (req) return `${req.protocol}://${req.get("host")}`;
+  if (fromEnv) return preferHttps(fromEnv);
+  if (req) {
+    const proto =
+      (req.get("x-forwarded-proto") || req.protocol || "http").split(",")[0]?.trim() ||
+      "http";
+    const host = req.get("x-forwarded-host") || req.get("host") || "";
+    if (!host) return "";
+    return preferHttps(`${proto}://${host}`);
+  }
   return "";
 }
 
-/** Приводит URL загрузок к текущему хосту (Railway / локальный порт). */
+/** Путь вида /uploads/… из любого сохранённого URL. */
+export function uploadPathFromUrl(url: unknown): string | null {
+  if (url == null || url === "") return null;
+  const raw = String(url).trim();
+  if (!raw) return null;
+  try {
+    if (/^https?:\/\//i.test(raw)) {
+      const parsed = new URL(raw);
+      if (parsed.pathname.startsWith("/uploads/")) return parsed.pathname;
+      return null;
+    }
+    if (raw.startsWith("/uploads/")) return raw;
+    if (raw.startsWith("uploads/")) return `/${raw}`;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Абсолютный HTTPS-URL для API и мобильного клиента. */
 export function normalizeMediaUrl(url: unknown, origin: string): string | null {
   if (url == null || url === "") return null;
   const raw = String(url).trim();
   if (!raw) return null;
 
-  try {
-    if (/^https?:\/\//i.test(raw)) {
-      const parsed = new URL(raw);
-      if (parsed.pathname.startsWith("/uploads/")) {
-        return origin ? `${origin}${parsed.pathname}` : parsed.pathname;
-      }
-      return raw;
-    }
-    if (raw.startsWith("/uploads/")) {
-      return origin ? `${origin}${raw}` : raw;
-    }
-    if (raw.startsWith("uploads/")) {
-      return origin ? `${origin}/${raw}` : `/${raw}`;
-    }
-    return raw;
-  } catch {
-    return raw;
+  const uploadPath = uploadPathFromUrl(raw);
+  if (uploadPath) {
+    const base = preferHttps(origin);
+    return base ? `${base}${uploadPath}` : uploadPath;
   }
+
+  if (/^https?:\/\//i.test(raw)) return preferHttps(raw);
+  return raw;
 }
 
 export function parseImagesField(images: unknown): string[] {

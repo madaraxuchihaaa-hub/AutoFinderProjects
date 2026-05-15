@@ -23,9 +23,12 @@ import { hasWebBuild, registerWeb } from "./serveWeb.js";
 dotenv.config();
 
 const app = express();
+app.set("trust proxy", 1);
 app.use(cors({ origin: true }));
 app.use(express.json());
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+app.use("/uploads", express.static(uploadsDir));
 
 app.get("/api/stats", async (_req, res) => {
   const [a, l, q] = await Promise.all([

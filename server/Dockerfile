@@ -14,6 +14,8 @@ COPY public ./public
 COPY src ./src
 COPY tsconfig.json ./
 
+RUN mkdir -p uploads
+
 EXPOSE 3000
 ENV PORT=3000
 

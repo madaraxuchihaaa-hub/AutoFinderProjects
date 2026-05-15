@@ -13,7 +13,7 @@ import {
 import { CommonActions, useFocusEffect } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
-import { apiGet } from "../api/client";
+import { apiGet, resolveMediaUrl } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
 import type { ListingRow } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
@@ -122,7 +122,7 @@ export default function CatalogScreen({ navigation }: Props) {
         <Text style={styles.empty}>Пока нет объявлений</Text>
       }
       renderItem={({ item }) => {
-        const uri = item.images?.[0];
+        const uri = resolveMediaUrl(item.images?.[0]);
         return (
           <Pressable
             onPress={() =>

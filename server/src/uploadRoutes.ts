@@ -46,10 +46,7 @@ export function registerUploadRoutes(app: Express, requireAuth: RequestHandler):
         res.status(400).json({ error: "validation", message: "Выберите хотя бы одно фото." });
         return;
       }
-      const base =
-        process.env.PUBLIC_BASE_URL?.replace(/\/$/, "") ||
-        `${req.protocol}://${req.get("host")}`;
-      const urls = files.map((f) => `${base}/uploads/${f.filename}`);
+      const urls = files.map((f) => `/uploads/${f.filename}`);
       res.json({ urls });
     });
   });

@@ -56,6 +56,32 @@ export function getApiBaseUrl(): string {
   return "http://localhost:3000";
 }
 
+/** Абсолютный URL для /uploads и старых http-ссылок с API. */
+export function resolveMediaUrl(raw: string | null | undefined): string | null {
+  if (raw == null || raw === "") return null;
+  const u = String(raw).trim();
+  if (!u) return null;
+  const base = getApiBaseUrl().replace(/\/$/, "");
+  if (!base) return u;
+  try {
+    if (/^https?:\/\//i.test(u)) {
+      const parsed = new URL(u);
+      if (parsed.pathname.startsWith("/uploads/")) {
+        return `${base}${parsed.pathname}`;
+      }
+      if (u.startsWith("http://") && base.startsWith("https://")) {
+        return `https://${u.slice(7)}`;
+      }
+      return u;
+    }
+    if (u.startsWith("/uploads/")) return `${base}${u}`;
+    if (u.startsWith("uploads/")) return `${base}/${u}`;
+    return u;
+  } catch {
+    return u.startsWith("/") ? `${base}${u}` : u;
+  }
+}
+
 type AuthOption = { auth?: boolean };
 
 async function buildHeaders(

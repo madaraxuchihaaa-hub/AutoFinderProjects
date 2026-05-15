@@ -16,7 +16,7 @@ import { CommonActions } from "@react-navigation/native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { LinearGradient } from "expo-linear-gradient";
-import { apiGet } from "../api/client";
+import { apiGet, resolveMediaUrl } from "../api/client";
 import FilterSelect from "../components/FilterSelect";
 import VehicleAutocomplete from "../components/VehicleAutocomplete";
 import PriceText from "../components/PriceText";
@@ -392,7 +392,7 @@ export default function ListingsScreen({ navigation }: Props) {
         />
       }
       renderItem={({ item }) => {
-        const uri = item.images?.[0];
+        const uri = resolveMediaUrl(item.images?.[0]);
         return (
           <Pressable
             onPress={() =>

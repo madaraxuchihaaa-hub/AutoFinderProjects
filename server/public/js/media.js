@@ -15,17 +15,26 @@ export function parseImagesField(images) {
   return [];
 }
 
+function pageOrigin() {
+  const { protocol, host } = window.location;
+  const p = protocol === "http:" && host.includes("railway.app") ? "https:" : protocol;
+  return `${p}//${host}`;
+}
+
 export function resolveMediaUrl(raw) {
   if (raw == null || raw === "") return null;
   const u = String(raw).trim();
   if (!u) return null;
-  const origin = window.location.origin;
+  const origin = pageOrigin();
 
   try {
     if (/^https?:\/\//i.test(u)) {
       const parsed = new URL(u);
       if (parsed.pathname.startsWith("/uploads/")) {
         return `${origin}${parsed.pathname}`;
+      }
+      if (u.startsWith("http://") && window.location.protocol === "https:") {
+        return `https://${u.slice(7)}`;
       }
       return u;
     }

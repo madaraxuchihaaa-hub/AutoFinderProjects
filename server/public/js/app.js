@@ -101,6 +101,55 @@ function fmtUsd(byn) {
   return usd > 0 ? `≈ ${usd.toLocaleString("ru-BY")} $` : "";
 }
 
+function fmtEngineMl(ml) {
+  if (ml == null || !Number(ml)) return "—";
+  return `${(Number(ml) / 1000).toFixed(1)} л`;
+}
+
+/** Все характеристики как в мобильном приложении. */
+function listingSpecRows(item) {
+  const rows = [
+    ["Марка / модель", `${item.brand || ""} ${item.model || ""}`.trim() || "—"],
+    ["Год", item.year != null ? String(item.year) : "—"],
+    [
+      "Пробег",
+      item.mileage_km != null
+        ? `${Number(item.mileage_km).toLocaleString("ru-BY")} км`
+        : "—",
+    ],
+    ["Комплектация", item.trim_level || "—"],
+    ["Салон", item.interior || "—"],
+  ];
+  if (item.interior_details) {
+    rows.push(["Характеристики салона", item.interior_details]);
+  }
+  if (item.safety_systems) {
+    rows.push(["Системы безопасности", item.safety_systems]);
+  }
+  if (item.plate_number) {
+    rows.push(["Госномер", item.plate_number]);
+  }
+  rows.push(
+    ["Топливо", label(FUEL, item.fuel_type)],
+    ["КПП", label(TRANS, item.transmission)],
+    ["Кузов", label(BODY, item.body_type)]
+  );
+  if (item.drivetrain) rows.push(["Привод", item.drivetrain]);
+  if (item.engine_volume_ml) {
+    rows.push(["Объём двигателя", fmtEngineMl(item.engine_volume_ml)]);
+  }
+  if (item.color) rows.push(["Цвет", item.color]);
+  if (item.vin) rows.push(["VIN", item.vin]);
+  rows.push(["Город", item.city || "—"]);
+  return rows;
+}
+
+function specsGridHtml(rows) {
+  return `<dl class="ls-av__specs ls-av__specs--full">${rows
+    .map(([dt, dd]) => `<div><dt>${esc(dt)}</dt><dd>${esc(dd)}</dd></div>`)
+    .join("")}</dl>`;
+}
+
 function fmtDt(s) {
   const d = new Date(s);
   if (!Number.isFinite(d.getTime())) return "";
@@ -184,6 +233,9 @@ function catalogCard(item, opts = {}) {
     label(BODY, item.body_type),
     label(TRANS, item.transmission),
     label(FUEL, item.fuel_type),
+    item.drivetrain || null,
+    item.engine_volume_ml ? fmtEngineMl(item.engine_volume_ml) : null,
+    item.trim_level || null,
   ].filter(Boolean);
   const title = item.title || `${item.brand || ""} ${item.model || ""}`.trim();
   const status = STATUS[item.status] || item.status || "—";
@@ -429,10 +481,26 @@ function renderPagination(page, totalPages, query) {
   return html;
 }
 
+async function probeListingImages(av, urls) {
+  if (!urls.length) return;
+  const hint = av.querySelector("#listing-images-hint");
+  if (!hint) return;
+  try {
+    const res = await fetch(urls[0], { method: "HEAD", cache: "no-store" });
+    if (!res.ok) hint.hidden = false;
+  } catch {
+    hint.hidden = false;
+  }
+}
+
 function initListingDetail(root) {
   const av = root.querySelector("#listing-av-card");
   if (!av) return;
   const stageImg = av.querySelector(".ls-av__stage-img");
+  const urls = [...av.querySelectorAll(".ls-av__stage-img, .ls-av__thumb")]
+    .map((el) => el.getAttribute("src"))
+    .filter(Boolean);
+  void probeListingImages(av, urls);
   av.querySelectorAll(".ls-av__nav-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const src = btn.getAttribute("data-src");
@@ -544,8 +612,12 @@ async function pageListing(id) {
           .join("")}</div>`
       : "";
 
+  const specRows = listingSpecRows(item);
+
   app.innerHTML = `
     ${item.status === "moderation" ? '<p class="banner banner-warn">Объявление на модерации — в каталоге появится после проверки.</p>' : ""}
+    <p class="banner banner-warn" id="listing-images-hint" hidden>Фото не найдены на сервере. Загрузите их снова в приложении. На Railway подключите постоянный том для папки <strong>uploads</strong>.</p>
+    ${item.reject_reason ? `<p class="banner banner-warn">${esc(item.reject_reason)}</p>` : ""}
     <div class="ls-av" id="listing-av-card">
       <header class="ls-av__top">
         <h1 class="ls-av__title">${esc(item.title)}</h1>
@@ -587,16 +659,10 @@ async function pageListing(id) {
           <div class="ls-av__phone muted small" id="listing-phone-reveal" hidden></div>
         </aside>
       </div>
-      <div class="ls-av__panels">
-        <section class="ls-av__panel">
-          <h2 class="ls-av__panel-title">Параметры</h2>
-          <dl class="ls-av__specs">
-            <div><dt>Топливо</dt><dd>${esc(label(FUEL, item.fuel_type))}</dd></div>
-            <div><dt>Коробка</dt><dd>${esc(label(TRANS, item.transmission))}</dd></div>
-            <div><dt>Кузов</dt><dd>${esc(label(BODY, item.body_type))}</dd></div>
-            ${item.drivetrain ? `<div><dt>Привод</dt><dd>${esc(item.drivetrain)}</dd></div>` : ""}
-            <div><dt>Город</dt><dd>${esc(item.city)}</dd></div>
-          </dl>
+      <div class="ls-av__panels ls-av__panels--specs">
+        <section class="ls-av__panel ls-av__panel--wide">
+          <h2 class="ls-av__panel-title">Характеристики</h2>
+          ${specsGridHtml(specRows)}
         </section>
         <section class="ls-av__panel ls-av__panel--wide">
           <h2 class="ls-av__panel-title">Описание</h2>

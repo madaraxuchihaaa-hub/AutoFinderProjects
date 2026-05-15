@@ -114,3 +114,34 @@ body {
   padding: 3rem;
   color: var(--muted);
 }
+
+.ls-av__panels--specs {
+  grid-template-columns: 1fr;
+}
+
+.ls-av__specs--full {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.65rem 1.25rem;
+  margin: 0;
+}
+
+.ls-av__specs--full > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.2rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ls-av__specs--full dt {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.ls-av__specs--full dd {
+  margin: 0;
+  font-weight: 500;
+}
