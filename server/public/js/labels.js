@@ -41,3 +41,25 @@ export function label(map, key) {
   const k = String(key).toLowerCase();
   return map[k] || key;
 }
+
+/** Значения фильтров как в мобильном приложении (русские подписи → API ILIKE). */
+export const FILTER_TRANS = [
+  "Механика",
+  "Автомат",
+  "Робот",
+  "Вариатор",
+];
+export const FILTER_BODY = [
+  "Седан",
+  "Хэтчбек",
+  "Универсал",
+  "Купе",
+  "Кабриолет",
+  "Внедорожник",
+  "Кроссовер",
+  "Минивэн",
+  "Пикап",
+  "Лифтбек",
+];
+export const FILTER_FUEL = ["Бензин", "Дизель", "Электро", "Гибрид", "Газ"];
+export const FILTER_DRIVE = ["Передний", "Задний", "Полный"];

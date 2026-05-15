@@ -13,6 +13,9 @@ type Props = {
   onNavigateStaff: () => void;
   onNavigateCreate: () => void;
   onNavigateSettings: () => void;
+  onNavigateFavorites: () => void;
+  onNavigateCompare: () => void;
+  compareCount?: number;
 };
 
 export default function AppMenuSheet({
@@ -23,6 +26,9 @@ export default function AppMenuSheet({
   onNavigateStaff,
   onNavigateCreate,
   onNavigateSettings,
+  onNavigateFavorites,
+  onNavigateCompare,
+  compareCount = 0,
 }: Props) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -37,6 +43,13 @@ export default function AppMenuSheet({
         <View style={styles.handle} />
         <Text style={styles.title}>{t("tabMenu")}</Text>
         <MenuRow icon="car-sport" label={t("menuGarage")} onPress={onNavigateGarage} styles={styles} />
+        <MenuRow icon="heart-outline" label={t("menuFavorites")} onPress={onNavigateFavorites} styles={styles} />
+        <MenuRow
+          icon="git-compare-outline"
+          label={compareCount > 0 ? `${t("menuCompare")} (${compareCount})` : t("menuCompare")}
+          onPress={onNavigateCompare}
+          styles={styles}
+        />
         <MenuRow icon="add-circle-outline" label={t("menuNewListing")} onPress={onNavigateCreate} styles={styles} />
         {staff ? (
           <MenuRow

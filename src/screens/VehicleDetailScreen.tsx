@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { CommonActions } from "@react-navigation/native";
 import { apiGet, apiPost } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import { useSavedListings } from "../hooks/useSavedListings";
 import PriceText from "../components/PriceText";
 import type { RootStackParamList } from "../navigation/types";
 import { readPriceByn } from "../types/api";
@@ -78,7 +79,9 @@ function listingStatusLabel(status: string): string {
 export default function VehicleDetailScreen({ route, navigation }: Props) {
   const { scope, id } = route.params;
   const { user, token } = useAuth();
+  const { isFavorite, isCompared, toggleFavorite, toggleCompare } = useSavedListings();
   const [loading, setLoading] = useState(true);
+  const [saveBusy, setSaveBusy] = useState(false);
   const [agg, setAgg] = useState<AggDetail | null>(null);
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [chatBusy, setChatBusy] = useState(false);
@@ -179,6 +182,57 @@ export default function VehicleDetailScreen({ route, navigation }: Props) {
           <Text style={styles.rejectNote}>{listing.reject_reason}</Text>
         ) : null}
         {listing.description ? <Text style={styles.desc}>{listing.description}</Text> : null}
+
+        {listing.status === "published" && !isOwner ? (
+          <View style={styles.saveRow}>
+            <Pressable
+              disabled={saveBusy}
+              onPress={() => {
+                if (!token) {
+                  Alert.alert("Вход", "Войдите, чтобы сохранять объявления.");
+                  return;
+                }
+                setSaveBusy(true);
+                void toggleFavorite(listing.id).finally(() => setSaveBusy(false));
+              }}
+              style={({ pressed }) => [
+                styles.btnOutline,
+                isFavorite(listing.id) && styles.btnOutlineActive,
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <Text style={styles.btnOutlineTxt}>
+                {isFavorite(listing.id) ? "В избранном" : "В избранное"}
+              </Text>
+            </Pressable>
+            <Pressable
+              disabled={saveBusy}
+              onPress={() => {
+                if (!token) {
+                  Alert.alert("Вход", "Войдите, чтобы сравнивать объявления.");
+                  return;
+                }
+                setSaveBusy(true);
+                void toggleCompare(listing.id)
+                  .then((r) => {
+                    if (r === "limit") {
+                      Alert.alert("Сравнение", "Не больше 3 объявлений в сравнении.");
+                    }
+                  })
+                  .finally(() => setSaveBusy(false));
+              }}
+              style={({ pressed }) => [
+                styles.btnOutline,
+                isCompared(listing.id) && styles.btnOutlineActive,
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <Text style={styles.btnOutlineTxt}>
+                {isCompared(listing.id) ? "В сравнении" : "Сравнить"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {(canChat || listing.owner_phone) && (
           <View style={styles.actions}>
@@ -319,9 +373,16 @@ const styles = StyleSheet.create({
     lineHeight: 21,
     color: colors.textMuted,
   },
+  saveRow: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
   actions: {
     marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
+    marginTop: spacing.sm,
     gap: spacing.sm,
   },
   btnPrimary: {
@@ -341,6 +402,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   btnOutlineTxt: { fontFamily: fonts.semibold, fontSize: 15, color: colors.accent },
+  btnOutlineActive: {
+    backgroundColor: colors.accentDim,
+    borderColor: colors.accent,
+  },
   grid: {
     marginTop: spacing.lg,
     marginHorizontal: spacing.lg,

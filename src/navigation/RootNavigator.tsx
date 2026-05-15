@@ -4,7 +4,9 @@ import type { NativeStackNavigationOptions } from "@react-navigation/native-stac
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
 import { useAuth } from "../auth/AuthContext";
 import ChatDetailScreen from "../screens/ChatDetailScreen";
+import CompareScreen from "../screens/CompareScreen";
 import CreateListingScreen from "../screens/CreateListingScreen";
+import FavoritesScreen from "../screens/FavoritesScreen";
 import LoginScreen from "../screens/LoginScreen";
 import MainTabs from "./MainTabs";
 import PlatformsScreen from "../screens/PlatformsScreen";
@@ -63,36 +65,46 @@ export default function RootNavigator() {
     );
   }
 
-  const guest = !token;
+  const screenOptions = {
+    headerStyle: { backgroundColor: colors.bgElevated },
+    headerTintColor: colors.text,
+    headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 17, color: colors.text },
+    headerShadowVisible: false,
+    contentStyle: { backgroundColor: colors.bg },
+  };
 
   return (
     <Stack.Navigator
-      key={guest ? "guest" : "user"}
+      key={token ? "user" : "guest"}
       id="AutofinderStack"
-      screenOptions={{
-        headerStyle: { backgroundColor: colors.bgElevated },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 17, color: colors.text },
-        headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.bg },
-      }}
+      initialRouteName="Main"
+      screenOptions={screenOptions}
     >
-      {guest ? (
+      <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="VehicleDetail"
+        component={VehicleDetailScreen}
+        options={({ navigation }) => ({
+          title: "Карточка",
+          headerTitleAlign: "center",
+          headerLeft: () => <HeaderBack onPress={() => navigation.goBack()} />,
+          headerRight: () => <HeaderSideSpacer />,
+          headerLeftContainerStyle: { width: HEADER_SIDE, minWidth: HEADER_SIDE },
+          headerRightContainerStyle: { width: HEADER_SIDE, minWidth: HEADER_SIDE },
+          headerTitleContainerStyle: { left: HEADER_SIDE, right: HEADER_SIDE },
+          headerStyle: { backgroundColor: colors.bg },
+        })}
+      />
+      <Stack.Screen
+        name="Login"
+        component={LoginScreen}
+        options={{ headerShown: false, presentation: "modal" }}
+      />
+      <Stack.Screen name="Register" component={RegisterScreen} options={{ title: "Регистрация" }} />
+      <Stack.Screen name="Favorites" component={FavoritesScreen} options={{ title: "Избранное" }} />
+      <Stack.Screen name="Compare" component={CompareScreen} options={{ title: "Сравнение" }} />
+      {token ? (
         <>
-          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-          <Stack.Screen
-            name="Register"
-            component={RegisterScreen}
-            options={{ title: "Регистрация" }}
-          />
-        </>
-      ) : (
-        <>
-          <Stack.Screen
-            name="Main"
-            component={MainTabs}
-            options={{ headerShown: false }}
-          />
           <Stack.Screen
             name="Platforms"
             component={PlatformsScreen}
@@ -102,25 +114,6 @@ export default function RootNavigator() {
             name="CreateListing"
             component={CreateListingScreen}
             options={({ navigation }) => modalScreenOptions("Новое объявление", navigation)}
-          />
-          <Stack.Screen
-            name="VehicleDetail"
-            component={VehicleDetailScreen}
-            options={({ navigation }) => ({
-              title: "Карточка",
-              headerTitleAlign: "center",
-              headerLeft: () => <HeaderBack onPress={() => navigation.goBack()} />,
-              headerRight: () => <HeaderSideSpacer />,
-              headerLeftContainerStyle: { width: HEADER_SIDE, minWidth: HEADER_SIDE },
-              headerRightContainerStyle: { width: HEADER_SIDE, minWidth: HEADER_SIDE },
-              headerTitleContainerStyle: {
-                left: HEADER_SIDE,
-                right: HEADER_SIDE,
-              },
-              headerStyle: {
-                backgroundColor: colors.bg,
-              },
-            })}
           />
           <Stack.Screen
             name="ChatDetail"
@@ -141,7 +134,7 @@ export default function RootNavigator() {
             options={({ navigation }) => modalScreenOptions("Настройки", navigation)}
           />
         </>
-      )}
+      ) : null}
     </Stack.Navigator>
   );
 }

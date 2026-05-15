@@ -1,10 +1,18 @@
-import { BODY, FUEL, STATUS, TRANS, label } from "./labels.js";
+import {
+  BODY,
+  FUEL,
+  STATUS,
+  TRANS,
+  FILTER_BODY,
+  FILTER_DRIVE,
+  FILTER_FUEL,
+  FILTER_TRANS,
+  label,
+} from "./labels.js";
+import { CMP_MAX, createSavedStore } from "./saved.js";
 
 const TOKEN_KEY = "af_token";
 const USER_KEY = "af_user";
-const FAV_KEY = "af_favorites";
-const CMP_KEY = "af_compare";
-const CMP_MAX = 3;
 const PAGE_SIZE = 20;
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -12,6 +20,7 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
 let exchangeRate = null;
 let brandsCache = null;
+let saved = null;
 
 function esc(s) {
   return String(s ?? "")
@@ -33,33 +42,7 @@ function setUser(u, token) {
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(TOKEN_KEY);
   }
-  renderNav();
-}
-
-function getIds(key) {
-  try {
-    return JSON.parse(localStorage.getItem(key) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function setIds(key, ids) {
-  localStorage.setItem(key, JSON.stringify([...new Set(ids)].slice(0, 50)));
-}
-
-function toggleId(key, id, max) {
-  const ids = getIds(key);
-  const i = ids.indexOf(id);
-  if (i >= 0) ids.splice(i, 1);
-  else {
-    if (max && ids.length >= max) {
-      ids.shift();
-    }
-    ids.push(id);
-  }
-  setIds(key, ids);
-  return ids.includes(id);
+  void saved?.refresh().then(() => renderNav());
 }
 
 async function api(path, opts = {}) {
@@ -87,6 +70,8 @@ async function api(path, opts = {}) {
   }
   return data;
 }
+
+saved = createSavedStore({ getUser, api });
 
 async function loadRate() {
   if (exchangeRate) return exchangeRate;
@@ -150,7 +135,7 @@ function renderNav() {
   const nav = $("#site-nav");
   if (!nav) return;
   const user = getUser();
-  const cmp = getIds(CMP_KEY).length;
+  const cmp = saved?.compareCount ?? 0;
   let html = `
     <a href="${navHref("/listings")}">Каталог</a>
     <a href="${navHref("/compare")}">Сравнение${cmp ? ` (${cmp})` : ""}</a>
@@ -189,10 +174,8 @@ function renderNav() {
 
 function catalogCard(item, opts = {}) {
   const img = firstImg(item);
-  const favIds = getIds(FAV_KEY);
-  const cmpIds = getIds(CMP_KEY);
-  const isFav = favIds.includes(item.id);
-  const isCmp = cmpIds.includes(item.id);
+  const isFav = saved?.isFavorite(item.id);
+  const isCmp = saved?.isCompared(item.id);
   const user = getUser();
   const pBits = [
     item.year ? `${item.year} г.` : null,
@@ -254,16 +237,18 @@ function bindCardActions(root) {
   $$("[data-fav-btn]", root).forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
-      if (!getUser()) {
-        location.hash = "#/login";
-        return;
-      }
       const id =
         btn.getAttribute("data-fav") || btn.closest("[data-fav]")?.getAttribute("data-fav");
       if (!id) return;
-      const on = toggleId(FAV_KEY, id);
-      btn.classList.toggle("is-active", on);
-      btn.textContent = on ? "В избранном" : "В избранное";
+      void saved
+        ?.toggleFavorite(id)
+        .then((on) => {
+          btn.classList.toggle("is-active", on);
+          btn.textContent = on ? "В избранном" : "В избранное";
+        })
+        .catch(() => {
+          if (!getUser()) location.hash = "#/login";
+        });
     });
   });
   $$("[data-cmp-btn]", root).forEach((btn) => {
@@ -272,15 +257,20 @@ function bindCardActions(root) {
       const id =
         btn.getAttribute("data-cmp") || btn.closest("[data-cmp]")?.getAttribute("data-cmp");
       if (!id) return;
-      const ids = getIds(CMP_KEY);
-      if (!ids.includes(id) && ids.length >= CMP_MAX) {
-        alert(`В сравнении не больше ${CMP_MAX} объявлений.`);
-        return;
-      }
-      const on = toggleId(CMP_KEY, id, CMP_MAX);
-      btn.classList.toggle("is-active", on);
-      btn.textContent = on ? "В сравнении" : "Сравнить";
-      renderNav();
+      void saved
+        ?.toggleCompare(id)
+        .then((on) => {
+          btn.classList.toggle("is-active", on);
+          btn.textContent = on ? "В сравнении" : "Сравнить";
+          renderNav();
+        })
+        .catch((err) => {
+          if (err?.message === "limit") {
+            alert(`В сравнении не больше ${CMP_MAX} объявлений.`);
+            return;
+          }
+          if (!getUser()) location.hash = "#/login";
+        });
     });
   });
 }
@@ -305,6 +295,11 @@ function buildListParams(q) {
   if (q.body) p.set("body_type", q.body);
   if (q.transmission) p.set("transmission", q.transmission);
   if (q.city) p.set("q", [q.q, q.city].filter(Boolean).join(" "));
+  if (q.generation) p.set("generation", q.generation);
+  if (q.volume_from) p.set("volume_from", q.volume_from);
+  if (q.volume_to) p.set("volume_to", q.volume_to);
+  if (q.drivetrain) p.set("drivetrain", q.drivetrain);
+  if (q.currency) p.set("currency", q.currency);
   p.set("limit", String(PAGE_SIZE));
   p.set("offset", String(((Number(q.page) || 1) - 1) * PAGE_SIZE));
   return p;
@@ -328,15 +323,12 @@ async function pageListings(query) {
   const page = Number(query.page) || 1;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const fuelOpts = Object.entries(FUEL)
-    .map(([k, v]) => `<option value="${k}" ${query.fuel === k ? "selected" : ""}>${esc(v)}</option>`)
-    .join("");
-  const bodyOpts = Object.entries(BODY)
-    .map(([k, v]) => `<option value="${k}" ${query.body === k ? "selected" : ""}>${esc(v)}</option>`)
-    .join("");
-  const transOpts = Object.entries(TRANS)
-    .map(([k, v]) => `<option value="${k}" ${query.transmission === k ? "selected" : ""}>${esc(v)}</option>`)
-    .join("");
+  const optList = (vals, sel) =>
+    vals.map((v) => `<option value="${esc(v)}" ${sel === v ? "selected" : ""}>${esc(v)}</option>`).join("");
+  const fuelOpts = optList(FILTER_FUEL, query.fuel);
+  const bodyOpts = optList(FILTER_BODY, query.body);
+  const transOpts = optList(FILTER_TRANS, query.transmission);
+  const driveOpts = optList(FILTER_DRIVE, query.drivetrain);
   const brandOpts = brands
     .map((b) => `<option value="${esc(b.name)}" ${query.brand === b.name ? "selected" : ""}>${esc(b.name)}</option>`)
     .join("");
@@ -367,6 +359,11 @@ async function pageListings(query) {
         <label><span>Топливо</span><select name="fuel"><option value="">—</option>${fuelOpts}</select></label>
         <label><span>Кузов</span><select name="body"><option value="">—</option>${bodyOpts}</select></label>
         <label><span>Коробка</span><select name="transmission"><option value="">—</option>${transOpts}</select></label>
+        <label><span>Привод</span><select name="drivetrain"><option value="">—</option>${driveOpts}</select></label>
+        <label><span>Поколение</span><input type="text" name="generation" value="${esc(query.generation || "")}" placeholder="рестайлинг" /></label>
+        <label><span>Объём от, л</span><input type="number" name="volume_from" min="0" step="0.1" value="${esc(query.volume_from || "")}" /></label>
+        <label><span>Объём до, л</span><input type="number" name="volume_to" min="0" step="0.1" value="${esc(query.volume_to || "")}" /></label>
+        <label><span>Валюта цены</span><select name="currency"><option value="byn" ${query.currency !== "usd" ? "selected" : ""}>BYN</option><option value="usd" ${query.currency === "usd" ? "selected" : ""}>USD</option></select></label>
         <label><span>Город</span><input type="text" name="city" value="${esc(query.city || "")}" placeholder="Минск" /></label>
         <label class="filter-toggle"><span>Медиа</span>
           <span class="filter-toggle__box">
@@ -529,8 +526,8 @@ async function pageListing(id) {
   ]
     .filter(Boolean)
     .join(", ");
-  const isFav = getIds(FAV_KEY).includes(item.id);
-  const isCmp = getIds(CMP_KEY).includes(item.id);
+  const isFav = saved?.isFavorite(item.id);
+  const isCmp = saved?.isCompared(item.id);
   const canPhone = item.owner_phone && item.show_phone;
   const updated = item.updated_at || item.created_at;
   const navBtns =
@@ -578,11 +575,7 @@ async function pageListing(id) {
             </div>
           </div>
           <div class="ls-av__actions">
-            ${
-              user
-                ? `<button type="button" class="ls-av__btn ls-av__btn--ghost${isFav ? " is-active" : ""}" data-fav-btn data-fav="${esc(item.id)}">${isFav ? "Убрать из избранного" : "Добавить в избранное"}</button>`
-                : ""
-            }
+            <button type="button" class="ls-av__btn ls-av__btn--ghost${isFav ? " is-active" : ""}" data-fav-btn data-fav="${esc(item.id)}">${isFav ? "Убрать из избранного" : "Добавить в избранное"}</button>
             <button type="button" class="ls-av__btn ls-av__btn--ghost${isCmp ? " is-active" : ""}" data-cmp-btn data-cmp="${esc(item.id)}">${isCmp ? "Убрать из сравнения" : "Добавить к сравнению"}</button>
             <button type="button" class="ls-av__btn ls-av__btn--primary js-show-phone" data-phone="${esc(canPhone ? item.owner_phone : "")}" data-phone-visible="${canPhone ? "1" : "0"}" data-phone-missing-text="Продавец скрыл номер телефона в объявлении">Позвонить продавцу</button>
             ${user ? `<a class="ls-av__btn ls-av__btn--ghost" href="#/messages?listing=${esc(item.id)}">Открыть сообщения</a>` : ""}
@@ -735,23 +728,22 @@ function pageHelp() {
     <section class="card help-section"><h2>1. Как найти подходящий автомобиль</h2><ol><li>Откройте <a href="#/listings">каталог</a>.</li><li>Задайте марку, модель, цену, год, тип кузова и другие фильтры.</li><li>Включите фильтр «Только с фото».</li><li>Откройте карточку объявления для описания, фотографий и контактов.</li></ol></section>
     <section class="card help-section"><h2>2. Как связаться с продавцом</h2><ul><li>Если продавец разрешил показ телефона — кнопка «Позвонить продавцу».</li><li>Напишите через форму сообщения на странице объявления (нужен вход).</li><li>Все переписки — в разделе «Сообщения».</li></ul></section>
     <section class="card help-section"><h2>3. Как разместить объявление</h2><ol><li>Зарегистрируйтесь или войдите.</li><li>Размещение объявлений — в мобильном приложении AutoFinder.</li><li>После сохранения объявление может перейти на модерацию.</li></ol></section>
-    <section class="card help-section"><h2>4. Избранное и сравнение</h2><ul><li>Избранное и сравнение (до ${CMP_MAX} авто) сохраняются в браузере.</li><li>Калькулятор платежа на странице объявления — ориентировочный.</li></ul></section>
+    <section class="card help-section"><h2>4. Избранное и сравнение</h2><ul><li>После входа избранное и сравнение (до ${CMP_MAX} авто) синхронизируются с мобильным приложением.</li><li>Без входа данные хранятся только в этом браузере.</li><li>Калькулятор платежа на странице объявления — ориентировочный.</li></ul></section>
   `;
 }
 
 async function pageCompare() {
   await loadRate();
-  const ids = getIds(CMP_KEY);
   const app = $("#app");
   document.title = "Сравнение — AutoFinder";
-  if (!ids.length) {
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  const valid = await saved.loadCompareList();
+  if (!valid.length) {
     app.innerHTML = `
       <section class="hero hero-catalog card"><div class="hero-catalog__main"><p class="hero-kicker">Сравнение</p><h1>Сравнение автомобилей</h1><p class="muted">Сопоставляйте до ${CMP_MAX} объявлений.</p></div></section>
       <p class="empty">Пока нечего сравнивать. Добавьте объявления из каталога.</p>`;
     return;
   }
-  const items = await Promise.all(ids.map((id) => api(`/api/listings/${id}`).catch(() => null)));
-  const valid = items.filter(Boolean);
   const rows = [
     ["Цена", (i) => fmtByn(i.price_byn)],
     ["Год", (i) => String(i.year || "—")],
@@ -794,9 +786,15 @@ async function pageCompare() {
   `;
   $$("[data-cmp-remove]", app).forEach((btn) => {
     btn.addEventListener("click", () => {
-      toggleId(CMP_KEY, btn.getAttribute("data-cmp-remove"));
-      renderNav();
-      pageCompare();
+      void saved
+        .toggleCompare(btn.getAttribute("data-cmp-remove"))
+        .then(() => {
+          renderNav();
+          return pageCompare();
+        })
+        .catch((err) => {
+          if (err?.message === "limit") alert(`В сравнении не больше ${CMP_MAX} объявлений.`);
+        });
     });
   });
 }
@@ -873,30 +871,45 @@ async function pageProfile() {
     </div>
     <section class="card narrow-profile profile-form">
       <h2>Данные аккаунта</h2>
-      <p><strong>Имя:</strong> ${esc(me.full_name || "—")}</p>
-      <p><strong>Телефон:</strong> ${esc(me.phone || "—")}</p>
-      <p><strong>Роль:</strong> ${esc(me.role)}</p>
-      <p class="muted small">Редактирование профиля — в мобильном приложении.</p>
+      <form id="profile-form" class="stack">
+        <label>Имя<input type="text" name="full_name" maxlength="120" value="${esc(me.full_name || "")}" /></label>
+        <label>Телефон<input type="text" name="phone" maxlength="32" value="${esc(me.phone || "")}" placeholder="+375…" /></label>
+        <label>Госномер<input type="text" name="plate_number" maxlength="16" value="${esc(me.plate_number || "")}" /></label>
+        <p class="muted small">Роль: ${esc(me.role)} · ${esc(me.email)}</p>
+        <button type="submit">Сохранить</button>
+      </form>
+      <p id="profile-msg" class="success-msg hidden"></p>
     </section>
   `;
+  $("#profile-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      const updated = await api("/api/auth/profile", {
+        method: "PATCH",
+        body: JSON.stringify({
+          full_name: fd.get("full_name")?.toString().trim() || null,
+          phone: fd.get("phone")?.toString().trim() || null,
+          plate_number: fd.get("plate_number")?.toString().trim() || null,
+        }),
+      });
+      setUser(updated, localStorage.getItem(TOKEN_KEY));
+      const msg = $("#profile-msg");
+      msg.textContent = "Сохранено";
+      msg.classList.remove("hidden");
+    } catch (err) {
+      alert(err.message);
+    }
+  });
 }
 
 async function pageFavorites() {
-  const user = getUser();
-  if (!user) {
-    location.hash = "#/login";
-    return;
-  }
   await loadRate();
-  const ids = getIds(FAV_KEY);
   const app = $("#app");
   document.title = "Избранное — AutoFinder";
-  if (!ids.length) {
-    app.innerHTML = `<section class="hero"><h1>Избранное</h1></section><p class="empty">Список пуст.</p>`;
-    return;
-  }
-  const items = (await Promise.all(ids.map((id) => api(`/api/listings/${id}`).catch(() => null)))).filter(Boolean);
-  app.innerHTML = `<section class="hero"><h1>Избранное</h1></section><div class="catalog-grid">${items.map((i) => catalogCard(i)).join("")}</div>`;
+  app.innerHTML = `<p class="loading">Загрузка…</p>`;
+  const items = await saved.loadFavoritesList();
+  app.innerHTML = `<section class="hero"><h1>Избранное</h1><p class="muted small">${getUser() ? "Синхронизируется с приложением" : "Войдите, чтобы сохранить на всех устройствах"}</p></section>${items.length ? `<div class="catalog-grid">${items.map((i) => catalogCard(i)).join("")}</div>` : '<p class="empty">Список пуст.</p>'}`;
   bindCardActions(app);
 }
 
@@ -974,7 +987,12 @@ async function router() {
   }
 }
 
-renderNav();
-window.addEventListener("hashchange", router);
-if (!location.hash || location.hash === "#") location.hash = "#/listings";
-else router();
+async function boot() {
+  await saved.refresh();
+  renderNav();
+  window.addEventListener("hashchange", router);
+  if (!location.hash || location.hash === "#") location.hash = "#/listings";
+  else await router();
+}
+
+void boot();

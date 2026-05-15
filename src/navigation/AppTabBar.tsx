@@ -7,11 +7,23 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { usePreferences } from "../preferences/PreferencesContext";
 import { fonts, radii, spacing } from "../theme";
 import AppMenuSheet from "./AppMenuSheet";
+import { useAuth } from "../auth/AuthContext";
+import { useSavedListings } from "../hooks/useSavedListings";
 
 export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors, t } = usePreferences();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { token } = useAuth();
+  const { compareIds } = useSavedListings();
+
+  function requireAuth(then: () => void) {
+    if (!token) {
+      navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Login" }));
+      return;
+    }
+    then();
+  }
   const padBottom = Math.max(insets.bottom + 6, Platform.OS === "android" ? 22 : 10);
   const activeRoute = state.routes[state.index]?.name;
 
@@ -61,24 +73,41 @@ export default function AppTabBar({ state, navigation }: BottomTabBarProps) {
         onClose={() => setMenuOpen(false)}
         onNavigateGarage={() => {
           setMenuOpen(false);
-          go("Garage");
+          requireAuth(() => go("Garage"));
         }}
         onNavigateProfile={() => {
           setMenuOpen(false);
-          go("Profile");
+          requireAuth(() => go("Profile"));
         }}
         onNavigateStaff={() => {
           setMenuOpen(false);
-          go("Staff");
+          requireAuth(() => go("Staff"));
         }}
         onNavigateCreate={() => {
           setMenuOpen(false);
-          navigation.getParent()?.dispatch(CommonActions.navigate({ name: "CreateListing" }));
+          requireAuth(() =>
+            navigation.getParent()?.dispatch(CommonActions.navigate({ name: "CreateListing" }))
+          );
         }}
         onNavigateSettings={() => {
           setMenuOpen(false);
-          navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Settings" }));
+          requireAuth(() =>
+            navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Settings" }))
+          );
         }}
+        onNavigateFavorites={() => {
+          setMenuOpen(false);
+          requireAuth(() =>
+            navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Favorites" }))
+          );
+        }}
+        onNavigateCompare={() => {
+          setMenuOpen(false);
+          requireAuth(() =>
+            navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Compare" }))
+          );
+        }}
+        compareCount={compareIds.length}
       />
     </>
   );

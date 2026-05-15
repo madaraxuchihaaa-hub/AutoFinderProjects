@@ -11,6 +11,7 @@ import { registerChatRoutes } from "./chatRoutes.js";
 import { getUsdPerByn, bynToUsd } from "./exchangeRates.js";
 import { parseListingSearchQuery, searchPublishedListings } from "./listingSearch.js";
 import { registerStaffRoutes } from "./staffRoutes.js";
+import { registerSavedListingRoutes } from "./savedListingRoutes.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
 import { seedCarCatalogIfNeeded } from "./seedCarCatalog.js";
@@ -193,6 +194,7 @@ registerProtectedListingRoutes(app, pool, requireAuth);
 registerAdminUserRoutes(app, pool, requireAuth, requireAdmin);
 registerChatRoutes(app, pool, requireAuth);
 registerStaffRoutes(app, pool, requireAuth, requireStaff);
+registerSavedListingRoutes(app, pool, requireAuth);
 
 registerWeb(app);
 

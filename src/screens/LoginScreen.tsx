@@ -30,6 +30,7 @@ export default function LoginScreen({ navigation }: Props) {
     setBusy(true);
     try {
       await login(email.trim(), password);
+      if (navigation.canGoBack()) navigation.goBack();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Ошибка входа");
     } finally {

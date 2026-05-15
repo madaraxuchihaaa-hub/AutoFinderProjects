@@ -23,6 +23,8 @@ export type RootStackParamList = {
     title?: string;
     listingTitle?: string;
   };
+  Favorites: undefined;
+  Compare: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

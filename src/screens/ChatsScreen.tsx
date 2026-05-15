@@ -14,6 +14,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { CommonActions } from "@react-navigation/native";
 import { apiGet } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 import type { MainTabParamList } from "../navigation/types";
 import type { ConversationRow } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
@@ -21,15 +22,20 @@ import { colors, fonts, radii, spacing } from "../theme";
 type Props = BottomTabScreenProps<MainTabParamList, "Chats">;
 
 export default function ChatsScreen({ navigation }: Props) {
+  const { token } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
   const [items, setItems] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    if (!token) {
+      setItems([]);
+      return;
+    }
     const data = await apiGet<ConversationRow[]>("/api/conversations");
     setItems(data);
-  }, []);
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,6 +67,23 @@ export default function ChatsScreen({ navigation }: Props) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} size="large" />
+      </View>
+    );
+  }
+
+  if (!token) {
+    return (
+      <View style={[styles.center, { paddingHorizontal: spacing.lg }]}>
+        <Text style={styles.guestTitle}>Войдите в аккаунт</Text>
+        <Text style={styles.guestHint}>Чаты доступны после входа — как на сайте.</Text>
+        <Pressable
+          style={styles.guestBtn}
+          onPress={() =>
+            navigation.getParent()?.dispatch(CommonActions.navigate({ name: "Login" }))
+          }
+        >
+          <Text style={styles.guestBtnTxt}>Войти</Text>
+        </Pressable>
       </View>
     );
   }
@@ -159,4 +182,25 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontStyle: "italic",
   },
+  guestTitle: {
+    fontFamily: fonts.bold,
+    fontSize: 18,
+    color: colors.text,
+    marginBottom: spacing.sm,
+    textAlign: "center",
+  },
+  guestHint: {
+    fontFamily: fonts.regular,
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: "center",
+    marginBottom: spacing.lg,
+  },
+  guestBtn: {
+    backgroundColor: colors.accent,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: radii.md,
+  },
+  guestBtnTxt: { fontFamily: fonts.semibold, fontSize: 16, color: colors.bg },
 });
