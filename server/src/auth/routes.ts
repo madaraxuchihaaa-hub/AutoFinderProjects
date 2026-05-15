@@ -76,14 +76,22 @@ export function registerAuthRoutes(app: Express, pool: Pool): void {
     }
 
     const { rows } = await pool.query<
-      UserRow & { password_hash: string }
+      UserRow & { password_hash: string; is_blocked?: boolean }
     >(
-      `SELECT id, email, password_hash, full_name, phone, role, created_at FROM users WHERE email = $1`,
+      `SELECT id, email, password_hash, full_name, phone, role, created_at, is_blocked
+       FROM users WHERE email = $1`,
       [email]
     );
     const row = rows[0];
     if (!row) {
       res.status(401).json({ error: "credentials", message: "Неверный email или пароль." });
+      return;
+    }
+    if (row.is_blocked) {
+      res.status(403).json({
+        error: "blocked",
+        message: "Учётная запись заблокирована. Обратитесь к администратору.",
+      });
       return;
     }
     const ok = await bcrypt.compare(password, row.password_hash);

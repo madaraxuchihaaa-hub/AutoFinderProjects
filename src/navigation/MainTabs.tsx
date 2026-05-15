@@ -2,32 +2,21 @@ import { CommonActions } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useMemo } from "react";
-import { Platform, Pressable, StyleSheet } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "../auth/AuthContext";
+import { Pressable, StyleSheet } from "react-native";
+import { usePreferences } from "../preferences/PreferencesContext";
 import AggregatedScreen from "../screens/AggregatedScreen";
 import CatalogScreen from "../screens/CatalogScreen";
 import HomeScreen from "../screens/HomeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
-import QueueScreen from "../screens/QueueScreen";
 import StaffPanelScreen from "../screens/StaffPanelScreen";
-import { colors, fonts } from "../theme";
+import AppTabBar, { hiddenTabOptions } from "./AppTabBar";
+import { fonts } from "../theme";
 import type { MainTabParamList } from "./types";
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-/** На Android с жестовой навигацией insets.bottom часто 0 — добавляем запас над системной полосой. */
-function tabBarBottomPadding(insetsBottom: number): number {
-  const minAndroid = Platform.OS === "android" ? 22 : 10;
-  return Math.max(insetsBottom + 6, minAndroid);
-}
-
 export default function MainTabs() {
-  const insets = useSafeAreaInsets();
-  const { user } = useAuth();
-  const staff = user?.role === "admin" || user?.role === "moderator";
-  const padBottom = tabBarBottomPadding(insets.bottom);
-  const barHeight = 52 + padBottom;
+  const { colors } = usePreferences();
 
   const screenOptions = useMemo(
     () => ({
@@ -43,67 +32,28 @@ export default function MainTabs() {
       },
       headerShadowVisible: false,
       tabBarHideOnKeyboard: true,
-      tabBarStyle: {
-        backgroundColor: colors.bgElevated,
-        borderTopColor: colors.border,
-        borderTopWidth: StyleSheet.hairlineWidth,
-        height: barHeight,
-        paddingBottom: padBottom,
-        paddingTop: 6,
-        elevation: 12,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 6,
-      },
-      tabBarActiveTintColor: colors.accent,
-      tabBarInactiveTintColor: colors.textMuted,
-      tabBarLabelStyle: {
-        fontFamily: fonts.medium,
-        fontSize: 11,
-        marginTop: -2,
-        marginBottom: 0,
-      },
-      tabBarIconStyle: { marginTop: 2 },
-      tabBarItemStyle: Platform.OS === "android" ? { paddingVertical: 0 } : undefined,
     }),
-    [barHeight, padBottom]
+    [colors]
   );
 
   return (
-    <Tab.Navigator id="AutofinderTabs" screenOptions={screenOptions}>
+    <Tab.Navigator
+      id="AutofinderTabs"
+      tabBar={(props) => <AppTabBar {...props} />}
+      screenOptions={screenOptions}
+    >
       <Tab.Screen
         name="Home"
         component={HomeScreen}
-        options={{
-          title: "Главная",
-          tabBarLabel: "Главная",
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" color={color} size={size + (Platform.OS === "android" ? 1 : 0)} />
-          ),
-        }}
+        options={{ title: "Главная", headerShown: false }}
       />
-      <Tab.Screen
-        name="Market"
-        component={AggregatedScreen}
-        options={{
-          title: "Рынок",
-          tabBarLabel: "Рынок",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="globe-outline" color={color} size={size + (Platform.OS === "android" ? 1 : 0)} />
-          ),
-        }}
-      />
+      <Tab.Screen name="Market" component={AggregatedScreen} options={{ title: "Рынок" }} />
       <Tab.Screen
         name="Garage"
         component={CatalogScreen}
         options={({ navigation }) => ({
           title: "Гараж",
-          tabBarLabel: "Гараж",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="car-sport" color={color} size={size + (Platform.OS === "android" ? 1 : 0)} />
-          ),
+          ...hiddenTabOptions(),
           headerRight: () => (
             <Pressable
               hitSlop={12}
@@ -120,44 +70,14 @@ export default function MainTabs() {
         })}
       />
       <Tab.Screen
-        name="Automation"
-        component={QueueScreen}
-        options={{
-          title: "Очередь",
-          tabBarLabel: "Очередь",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="flash" color={color} size={size + (Platform.OS === "android" ? 1 : 0)} />
-          ),
-        }}
+        name="Staff"
+        component={StaffPanelScreen}
+        options={{ title: "Панель", headerShown: false, ...hiddenTabOptions() }}
       />
-      {staff ? (
-        <Tab.Screen
-          name="Staff"
-          component={StaffPanelScreen}
-          options={{
-            title: user?.role === "admin" ? "Админ" : "Модерация",
-            tabBarLabel: user?.role === "admin" ? "Админ" : "Модерация",
-            headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons
-                name={user?.role === "admin" ? "speedometer-outline" : "shield-checkmark-outline"}
-                color={color}
-                size={size + (Platform.OS === "android" ? 1 : 0)}
-              />
-            ),
-          }}
-        />
-      ) : null}
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          title: "Профиль",
-          tabBarLabel: "Профиль",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-circle-outline" color={color} size={size + (Platform.OS === "android" ? 1 : 0)} />
-          ),
-        }}
+        options={{ title: "Профиль", ...hiddenTabOptions() }}
       />
     </Tab.Navigator>
   );

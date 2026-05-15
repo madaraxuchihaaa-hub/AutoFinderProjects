@@ -1,48 +1,69 @@
-import { NavigationContainer, DarkTheme, Theme } from "@react-navigation/native";
-import { useEffect } from "react";
+import { NavigationContainer, DarkTheme, DefaultTheme, Theme } from "@react-navigation/native";
+import { useEffect, useMemo } from "react";
 import { ActivityIndicator, StatusBar, StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAppFonts } from "./fonts";
 import { AuthProvider } from "./auth/AuthContext";
+import { PreferencesProvider, usePreferences } from "./preferences/PreferencesContext";
 import RootNavigator from "./navigation/RootNavigator";
-import { colors } from "./theme";
 
-const navTheme: Theme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    primary: colors.accent,
-    background: colors.bg,
-    card: colors.bgElevated,
-    text: colors.text,
-    border: colors.border,
-    notification: colors.accent,
-  },
-};
-
-export default function App() {
-  const [loaded, err] = useAppFonts();
+function AppNavigation({
+  fontsLoaded,
+  fontErr,
+}: {
+  fontsLoaded: boolean;
+  fontErr: Error | null;
+}) {
+  const { ready: prefsReady, colors, theme } = usePreferences();
 
   useEffect(() => {
-    if (err) console.warn(err);
-  }, [err]);
+    if (fontErr) console.warn(fontErr);
+  }, [fontErr]);
 
-  if (!loaded) {
+  const navTheme: Theme = useMemo(
+    () => ({
+      ...(theme === "dark" ? DarkTheme : DefaultTheme),
+      colors: {
+        ...(theme === "dark" ? DarkTheme.colors : DefaultTheme.colors),
+        primary: colors.accent,
+        background: colors.bg,
+        card: colors.bgElevated,
+        text: colors.text,
+        border: colors.border,
+        notification: colors.accent,
+      },
+    }),
+    [theme, colors]
+  );
+
+  if (!fontsLoaded || !prefsReady) {
     return (
-      <View style={styles.boot}>
+      <View style={[styles.boot, { backgroundColor: colors.bg }]}>
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
 
   return (
+    <>
+      <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} />
+      <NavigationContainer theme={navTheme}>
+        <RootNavigator />
+      </NavigationContainer>
+    </>
+  );
+}
+
+export default function App() {
+  const [fontsLoaded, fontErr] = useAppFonts();
+
+  return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar barStyle="light-content" />
-        <NavigationContainer theme={navTheme}>
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
+      <PreferencesProvider>
+        <AuthProvider>
+          <AppNavigation fontsLoaded={fontsLoaded} fontErr={fontErr} />
+        </AuthProvider>
+      </PreferencesProvider>
     </SafeAreaProvider>
   );
 }
@@ -50,7 +71,6 @@ export default function App() {
 const styles = StyleSheet.create({
   boot: {
     flex: 1,
-    backgroundColor: colors.bg,
     alignItems: "center",
     justifyContent: "center",
   },

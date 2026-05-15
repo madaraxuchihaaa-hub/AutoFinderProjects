@@ -112,6 +112,48 @@ export async function apiPost<T>(
   return JSON.parse(text) as T;
 }
 
+export async function apiUploadImages(localUris: string[]): Promise<string[]> {
+  if (!localUris.length) return [];
+  const base = getApiBaseUrl();
+  const headers = await buildHeaders(false);
+  const formData = new FormData();
+  for (let i = 0; i < localUris.length; i++) {
+    const uri = localUris[i]!;
+    const baseName = uri.split("/").pop()?.split("?")[0] ?? `photo-${i}.jpg`;
+    const ext = baseName.includes(".") ? baseName.split(".").pop()!.toLowerCase() : "jpg";
+    const mime =
+      ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    formData.append("images", {
+      uri,
+      name: `photo-${i}.${ext === "png" || ext === "webp" ? ext : "jpg"}`,
+      type: mime,
+    } as unknown as Blob);
+  }
+  const res = await fetch(`${base}/api/upload/images`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    await parseError(res, text);
+  }
+  const data = JSON.parse(text) as { urls: string[] };
+  return data.urls ?? [];
+}
+
+export async function apiDelete<T>(path: string, opts?: AuthOption): Promise<T> {
+  const base = getApiBaseUrl();
+  const headers = await buildHeaders(false, opts);
+  const res = await fetch(`${base}${path}`, { method: "DELETE", headers });
+  const text = await res.text();
+  if (!res.ok) {
+    await parseError(res, text);
+  }
+  if (!text) return {} as T;
+  return JSON.parse(text) as T;
+}
+
 export async function apiPatch<T>(
   path: string,
   body: unknown,

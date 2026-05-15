@@ -1,6 +1,7 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
 import { enqueuePublicationQueue } from "./listingQueue.js";
+import { validateBrandModel } from "./vehicleRoutes.js";
 
 export function registerProtectedListingRoutes(
   app: Express,
@@ -55,6 +56,12 @@ export function registerProtectedListingRoutes(
     }
     if (!Number.isFinite(price_rub) || price_rub < 1) {
       res.status(400).json({ error: "validation", message: "Укажите цену больше 0." });
+      return;
+    }
+
+    const catalogErr = await validateBrandModel(pool, brand, model);
+    if (catalogErr) {
+      res.status(400).json({ error: "validation", message: catalogErr });
       return;
     }
 

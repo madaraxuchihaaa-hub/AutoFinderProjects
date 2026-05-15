@@ -19,20 +19,15 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import { useAuth } from "../auth/AuthContext";
-import { apiGet, apiPatch, apiPost } from "../api/client";
+import AdminUserManagement from "../components/AdminUserManagement";
+import { apiGet, apiPost } from "../api/client";
 import type { MainTabParamList } from "../navigation/types";
-import type { AdminUserRow, PendingListingRow, UserRole } from "../types/api";
+import type { PendingListingRow } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
 import { formatKm, formatRub } from "../utils/format";
 
 type Props = BottomTabScreenProps<MainTabParamList, "Staff">;
 type Section = "queue" | "users";
-
-function roleRu(role: UserRole): string {
-  if (role === "admin") return "Админ";
-  if (role === "moderator") return "Модератор";
-  return "Пользователь";
-}
 
 export default function StaffPanelScreen(_props: Props) {
   const { user } = useAuth();
@@ -40,7 +35,6 @@ export default function StaffPanelScreen(_props: Props) {
   const tabBarHeight = useBottomTabBarHeight();
   const [section, setSection] = useState<Section>("queue");
   const [pending, setPending] = useState<PendingListingRow[]>([]);
-  const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -52,15 +46,9 @@ export default function StaffPanelScreen(_props: Props) {
     setPending(data);
   }, []);
 
-  const loadUsers = useCallback(async () => {
-    const data = await apiGet<AdminUserRow[]>("/api/admin/users");
-    setUsers(data);
-  }, []);
-
   const loadAll = useCallback(async () => {
     await loadQueue();
-    if (isAdmin) await loadUsers();
-  }, [isAdmin, loadQueue, loadUsers]);
+  }, [loadQueue]);
 
   useFocusEffect(
     useCallback(() => {
@@ -118,15 +106,6 @@ export default function StaffPanelScreen(_props: Props) {
     }
   }
 
-  async function setUserRole(targetId: string, role: "user" | "moderator") {
-    try {
-      await apiPatch<AdminUserRow>(`/api/admin/users/${targetId}`, { role });
-      await loadUsers();
-    } catch (e) {
-      Alert.alert("Ошибка", e instanceof Error ? e.message : "Не удалось сохранить роль");
-    }
-  }
-
   if (loading) {
     return (
       <View style={styles.center}>
@@ -148,7 +127,7 @@ export default function StaffPanelScreen(_props: Props) {
         </Text>
         <Text style={styles.heroSub}>
           {isAdmin
-            ? "Заявки на публикацию и учётные записи"
+            ? "Модерация, пользователи, роли и блокировки"
             : "Проверка объявлений перед выходом в эфир"}
         </Text>
         {isAdmin ? (
@@ -265,78 +244,7 @@ export default function StaffPanelScreen(_props: Props) {
       )}
 
       {isAdmin && section === "users" && (
-        <FlatList
-          data={users}
-          keyExtractor={(it) => it.id}
-          contentContainerStyle={[
-            styles.list,
-            { paddingBottom: tabBarHeight + spacing.lg },
-          ]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.accent}
-              colors={Platform.OS === "android" ? [colors.accent] : undefined}
-              progressBackgroundColor={colors.bgElevated}
-            />
-          }
-          renderItem={({ item }) => (
-            <View style={styles.userCard}>
-              <View style={styles.userTop}>
-                <View style={styles.userMailWrap}>
-                  <Ionicons name="mail-outline" size={16} color={colors.textMuted} />
-                  <Text style={styles.userMail} numberOfLines={1}>
-                    {item.email}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.rolePill,
-                    item.role === "admin" && styles.rolePillAdmin,
-                    item.role === "moderator" && styles.rolePillMod,
-                  ]}
-                >
-                  <Text style={styles.rolePillTxt}>{roleRu(item.role)}</Text>
-                </View>
-              </View>
-              {item.role === "admin" ? (
-                <Text style={styles.protected}>Системная учётная запись</Text>
-              ) : (
-                <View style={styles.roleActions}>
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert("Роль «Пользователь»?", item.email, [
-                        { text: "Отмена", style: "cancel" },
-                        {
-                          text: "Да",
-                          onPress: () => void setUserRole(item.id, "user"),
-                        },
-                      ])
-                    }
-                    style={({ pressed }) => [styles.roleBtn, pressed && { opacity: 0.88 }]}
-                  >
-                    <Text style={styles.roleBtnTxt}>Пользователь</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert("Роль «Модератор»?", item.email, [
-                        { text: "Отмена", style: "cancel" },
-                        {
-                          text: "Да",
-                          onPress: () => void setUserRole(item.id, "moderator"),
-                        },
-                      ])
-                    }
-                    style={({ pressed }) => [styles.roleBtnAccent, pressed && { opacity: 0.88 }]}
-                  >
-                    <Text style={styles.roleBtnAccentTxt}>Модератор</Text>
-                  </Pressable>
-                </View>
-              )}
-            </View>
-          )}
-        />
+        <AdminUserManagement tabBarInset={tabBarHeight + spacing.lg} />
       )}
 
       <Modal visible={!!rejectModal} transparent animationType="fade">
@@ -517,58 +425,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   btnNoTxt: { fontFamily: fonts.semibold, fontSize: 15, color: colors.danger },
-  userCard: {
-    backgroundColor: colors.bgElevated,
-    borderRadius: radii.lg,
-    padding: spacing.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-  },
-  userTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  userMailWrap: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
-  userMail: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text, flex: 1 },
-  rolePill: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: radii.sm,
-    backgroundColor: colors.surface,
-  },
-  rolePillAdmin: { backgroundColor: "rgba(212,185,120,0.2)" },
-  rolePillMod: { backgroundColor: colors.accentDim },
-  rolePillTxt: { fontFamily: fonts.medium, fontSize: 12, color: colors.text },
-  protected: {
-    marginTop: spacing.sm,
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-  roleActions: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  roleBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    alignItems: "center",
-  },
-  roleBtnTxt: { fontFamily: fonts.semibold, fontSize: 14, color: colors.text },
-  roleBtnAccent: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radii.md,
-    backgroundColor: colors.accentDim,
-    alignItems: "center",
-  },
-  roleBtnAccentTxt: { fontFamily: fonts.semibold, fontSize: 14, color: colors.accent },
   modalBg: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.6)",

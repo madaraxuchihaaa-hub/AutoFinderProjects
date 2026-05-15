@@ -29,7 +29,13 @@
       "output": "single"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AutoFinder нужен доступ к фото для объявлений."
+        }
+      ]
     ],
     "extra": {
       "eas": {

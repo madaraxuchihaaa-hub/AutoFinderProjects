@@ -5,7 +5,6 @@ export type MainTabParamList = {
   Home: undefined;
   Market: undefined;
   Garage: undefined;
-  Automation: undefined;
   Staff: undefined;
   Profile: undefined;
 };
@@ -17,6 +16,7 @@ export type RootStackParamList = {
   VehicleDetail: { scope: "aggregated" | "listing"; id: string };
   CreateListing: undefined;
   Platforms: undefined;
+  Settings: undefined;
 };
 
 export type RootStackScreenProps<T extends keyof RootStackParamList> =

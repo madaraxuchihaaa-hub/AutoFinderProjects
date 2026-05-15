@@ -7,6 +7,8 @@ web-build/
 .env.local
 .env.docker
 server/.env
+server/uploads/
+uploads/
 .DS_Store
 
 # Android SDK path (создайте из local.properties)

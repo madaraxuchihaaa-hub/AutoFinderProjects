@@ -9,6 +9,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY migrations ./migrations
+COPY data ./data
 COPY src ./src
 COPY tsconfig.json ./
 

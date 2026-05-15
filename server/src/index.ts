@@ -1,19 +1,25 @@
 import cors from "cors";
 import dotenv from "dotenv";
 import express from "express";
+import path from "node:path";
 import { ensureJwtSecretConfigured } from "./auth/jwt.js";
 import { registerAuthRoutes } from "./auth/routes.js";
 import { optionalAuth, requireAdmin, requireAuth, requireStaff } from "./auth/middleware.js";
 import { registerProtectedListingRoutes } from "./listingsHandlers.js";
+import { registerAdminUserRoutes } from "./adminUserRoutes.js";
 import { registerStaffRoutes } from "./staffRoutes.js";
 import { pool } from "./db/pool.js";
 import { runMigrations } from "./db/runMigrations.js";
+import { seedCarCatalogIfNeeded } from "./seedCarCatalog.js";
+import { registerUploadRoutes } from "./uploadRoutes.js";
+import { registerVehicleRoutes } from "./vehicleRoutes.js";
 
 dotenv.config();
 
 const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.get("/api/stats", async (_req, res) => {
   const [a, l, q] = await Promise.all([
@@ -52,6 +58,20 @@ app.get("/api/platforms", async (_req, res) => {
 
 app.get("/api/aggregated", async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 30, 100);
+  const q = String(req.query.q ?? "").trim();
+  if (q) {
+    const pattern = `%${q}%`;
+    const { rows } = await pool.query(
+      `SELECT id, title, brand, model, year, mileage_km, price_rub, city, image_urls, fetched_at
+       FROM aggregated_listings
+       WHERE title ILIKE $1 OR brand ILIKE $1 OR model ILIKE $1 OR city ILIKE $1
+       ORDER BY fetched_at DESC
+       LIMIT $2`,
+      [pattern, limit]
+    );
+    res.json(rows);
+    return;
+  }
   const { rows } = await pool.query(
     `SELECT id, title, brand, model, year, mileage_km, price_rub, city, image_urls, fetched_at
      FROM aggregated_listings
@@ -131,15 +151,19 @@ app.get("/api/queue/summary", async (_req, res) => {
   res.json(rows);
 });
 
+registerVehicleRoutes(app, pool);
+registerUploadRoutes(app, requireAuth);
 registerAuthRoutes(app, pool);
 registerProtectedListingRoutes(app, pool, requireAuth);
-registerStaffRoutes(app, pool, requireAuth, requireStaff, requireAdmin);
+registerAdminUserRoutes(app, pool, requireAuth, requireAdmin);
+registerStaffRoutes(app, pool, requireAuth, requireStaff);
 
 const port = Number(process.env.PORT ?? 3000);
 
 async function main() {
   ensureJwtSecretConfigured();
   await runMigrations(pool);
+  await seedCarCatalogIfNeeded(pool);
   app.listen(port, () => {
     console.info(`AutoFinder API → http://localhost:${port}`);
   });

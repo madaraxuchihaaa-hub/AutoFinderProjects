@@ -1,14 +1,11 @@
 import type { Express, RequestHandler } from "express";
 import type { Pool } from "pg";
 import { enqueuePublicationQueue } from "./listingQueue.js";
-import type { UserRole } from "./auth/types.js";
-
 export function registerStaffRoutes(
   app: Express,
   pool: Pool,
   requireAuth: RequestHandler,
-  requireStaff: RequestHandler,
-  requireAdmin: RequestHandler
+  requireStaff: RequestHandler
 ): void {
   app.get("/api/staff/pending-listings", requireAuth, requireStaff, async (_req, res) => {
     const { rows } = await pool.query(
@@ -85,44 +82,4 @@ export function registerStaffRoutes(
     res.json({ ok: true, id: listingId, status: "archived" });
   });
 
-  app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
-    const { rows } = await pool.query(
-      `SELECT id, email, full_name, phone, role, created_at
-       FROM users
-       ORDER BY created_at DESC
-       LIMIT 500`
-    );
-    res.json(rows);
-  });
-
-  app.patch("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
-    const targetId = req.params.id;
-    const actorId = req.auth!.userId;
-    if (targetId === actorId) {
-      res.status(400).json({ error: "validation", message: "Нельзя изменить свою учётную запись здесь." });
-      return;
-    }
-
-    const roleRaw = req.body?.role;
-    if (roleRaw !== "user" && roleRaw !== "moderator") {
-      res.status(400).json({
-        error: "validation",
-        message: "Допустимая роль: user или moderator.",
-      });
-      return;
-    }
-    const newRole = roleRaw as UserRole;
-
-    const { rows } = await pool.query(
-      `UPDATE users SET role = $1, updated_at = NOW()
-       WHERE id = $2 AND role != 'admin'
-       RETURNING id, email, full_name, phone, role, created_at`,
-      [newRole, targetId]
-    );
-    if (!rows[0]) {
-      res.status(404).json({ error: "not_found", message: "Пользователь не найден или защищён от изменения." });
-      return;
-    }
-    res.json(rows[0]);
-  });
 }

@@ -50,7 +50,27 @@ export type AdminUserRow = {
   full_name: string | null;
   phone: string | null;
   role: UserRole;
+  is_blocked?: boolean;
   created_at: string;
+  updated_at?: string;
+  listings_count?: number;
+};
+
+export type AdminUserCreateBody = {
+  email: string;
+  password: string;
+  full_name?: string;
+  phone?: string;
+  role?: "user" | "moderator";
+};
+
+export type AdminUserUpdateBody = {
+  email?: string;
+  full_name?: string;
+  phone?: string;
+  role?: "user" | "moderator";
+  password?: string;
+  is_blocked?: boolean;
 };
 
 export type StatsResponse = {

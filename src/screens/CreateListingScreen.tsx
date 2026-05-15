@@ -2,6 +2,7 @@ import { useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,13 +14,18 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
+import * as ImagePicker from "expo-image-picker";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../auth/AuthContext";
-import { apiPost } from "../api/client";
+import VehicleAutocomplete, { validateBrandModelChoice } from "../components/VehicleAutocomplete";
+import { apiPost, apiUploadImages } from "../api/client";
 import type { RootStackParamList } from "../navigation/types";
 import type { CreateListingResponse } from "../types/api";
 import { colors, fonts, radii, spacing } from "../theme";
 
 type Props = NativeStackScreenProps<RootStackParamList, "CreateListing">;
+
+const MAX_PHOTOS = 8;
 
 export default function CreateListingScreen({ navigation }: Props) {
   const { user } = useAuth();
@@ -34,14 +40,48 @@ export default function CreateListingScreen({ navigation }: Props) {
   const [fuel, setFuel] = useState("");
   const [transmission, setTransmission] = useState("");
   const [body, setBody] = useState("");
+  const [localPhotos, setLocalPhotos] = useState<string[]>([]);
   const [imagesRaw, setImagesRaw] = useState("");
   const [busy, setBusy] = useState(false);
+
+  async function pickPhotos() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Доступ", "Разрешите доступ к галерее в настройках устройства.");
+      return;
+    }
+    const left = MAX_PHOTOS - localPhotos.length;
+    if (left <= 0) {
+      Alert.alert("Фото", `Максимум ${MAX_PHOTOS} фото.`);
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsMultipleSelection: true,
+      selectionLimit: left,
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const uris = result.assets.map((a) => a.uri).filter(Boolean);
+    setLocalPhotos((prev) => [...prev, ...uris].slice(0, MAX_PHOTOS));
+  }
+
+  function removePhoto(uri: string) {
+    setLocalPhotos((prev) => prev.filter((u) => u !== uri));
+  }
 
   async function submit() {
     const y = Number(year);
     const p = Number(price.replace(/\s/g, "").replace(",", "."));
-    if (!title.trim() || !brand.trim() || !model.trim()) {
+    const b = brand.trim();
+    const m = model.trim();
+    if (!title.trim() || !b || !m) {
       Alert.alert("Поля", "Заполните название, марку и модель.");
+      return;
+    }
+    const catalogOk = await validateBrandModelChoice(b, m);
+    if (!catalogOk) {
+      Alert.alert("Каталог", "Выберите марку и модель из подсказок списка.");
       return;
     }
     if (!Number.isFinite(y) || y < 1990 || y > 2030) {
@@ -52,18 +92,22 @@ export default function CreateListingScreen({ navigation }: Props) {
       Alert.alert("Цена", "Укажите цену в рублях.");
       return;
     }
-    const image_urls = imagesRaw
+    const urlFromText = imagesRaw
       .split(/[\n,]+/)
       .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 8);
+      .filter(Boolean);
     const mileage_km = mileage.trim() ? Number(mileage.replace(/\s/g, "")) : undefined;
     setBusy(true);
     try {
+      let uploaded: string[] = [];
+      if (localPhotos.length > 0) {
+        uploaded = await apiUploadImages(localPhotos);
+      }
+      const image_urls = [...uploaded, ...urlFromText].slice(0, MAX_PHOTOS);
       const res = await apiPost<CreateListingResponse>("/api/listings", {
         title: title.trim(),
-        brand: brand.trim(),
-        model: model.trim(),
+        brand: b,
+        model: m,
         year: y,
         price_rub: Math.round(p),
         mileage_km:
@@ -109,17 +153,29 @@ export default function CreateListingScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.hint}>
-          Фото — ссылки HTTPS, по строке или через запятую.
-        </Text>
         {user?.role === "user" ? (
           <Text style={styles.hint2}>Обычный пользователь: объявление сначала на модерации.</Text>
         ) : null}
         <Field label="Заголовок" value={title} onChangeText={setTitle} ph="Напр. BMW 320i, один владелец" />
-        <Row>
-          <FieldSmall label="Марка" value={brand} onChangeText={setBrand} ph="BMW" />
-          <FieldSmall label="Модель" value={model} onChangeText={setModel} ph="320i" />
-        </Row>
+        <VehicleAutocomplete
+          kind="brand"
+          label="Марка"
+          value={brand}
+          onChange={(v) => {
+            setBrand(v);
+            if (model && v !== brand) setModel("");
+          }}
+          onSelect={() => setModel("")}
+          placeholder="BMW"
+        />
+        <VehicleAutocomplete
+          kind="model"
+          label="Модель"
+          value={model}
+          brand={brand}
+          onChange={setModel}
+          placeholder="320i"
+        />
         <Row>
           <FieldSmall label="Год" value={year} onChangeText={setYear} ph="2020" keyboard="numeric" />
           <FieldSmall label="Цена, ₽" value={price} onChangeText={setPrice} ph="2500000" keyboard="numeric" />
@@ -134,13 +190,42 @@ export default function CreateListingScreen({ navigation }: Props) {
           <FieldSmall label="КПП" value={transmission} onChangeText={setTransmission} ph="Автомат" />
         </Row>
         <Field label="Кузов" value={body} onChangeText={setBody} ph="Седан" />
+
+        <Text style={styles.label}>Фото</Text>
+        <Pressable
+          onPress={() => void pickPhotos()}
+          style={({ pressed }) => [styles.galleryBtn, pressed && { opacity: 0.9 }]}
+        >
+          <Ionicons name="images-outline" size={22} color={colors.accent} />
+          <Text style={styles.galleryBtnText}>Выбрать из галереи</Text>
+          <Text style={styles.galleryCount}>
+            {localPhotos.length}/{MAX_PHOTOS}
+          </Text>
+        </Pressable>
+        {localPhotos.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.thumbs}>
+            {localPhotos.map((uri) => (
+              <View key={uri} style={styles.thumbWrap}>
+                <Image source={{ uri }} style={styles.thumb} />
+                <Pressable
+                  onPress={() => removePhoto(uri)}
+                  style={styles.thumbRemove}
+                  hitSlop={6}
+                >
+                  <Ionicons name="close-circle" size={22} color="#fff" />
+                </Pressable>
+              </View>
+            ))}
+          </ScrollView>
+        ) : null}
         <Field
-          label="Ссылки на фото"
+          label="Или ссылки HTTPS (по строке)"
           value={imagesRaw}
           onChangeText={setImagesRaw}
-          ph={"https://…jpg\nhttps://…jpg"}
+          ph={"https://…jpg"}
           multiline
         />
+
         <Pressable onPress={submit} disabled={busy} style={({ pressed }) => [pressed && { opacity: 0.9 }]}>
           <LinearGradient
             colors={[colors.accent, "#2BB8D4"]}
@@ -226,19 +311,11 @@ function Row({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xl * 3 },
-  hint: {
-    fontFamily: fonts.regular,
-    fontSize: 13,
-    lineHeight: 19,
-    color: colors.textMuted,
-    marginBottom: spacing.lg,
-  },
   hint2: {
     fontFamily: fonts.medium,
     fontSize: 12,
     lineHeight: 17,
     color: colors.accent,
-    marginTop: -spacing.md,
     marginBottom: spacing.lg,
   },
   field: { marginBottom: spacing.md },
@@ -261,7 +338,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
   },
-  inputMulti: { minHeight: 88, textAlignVertical: "top" },
+  inputMulti: { minHeight: 72, textAlignVertical: "top" },
+  galleryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.bgElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    marginBottom: spacing.sm,
+  },
+  galleryBtnText: {
+    flex: 1,
+    fontFamily: fonts.medium,
+    fontSize: 15,
+    color: colors.text,
+  },
+  galleryCount: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  thumbs: { marginBottom: spacing.md },
+  thumbWrap: { marginRight: spacing.sm, position: "relative" },
+  thumb: { width: 88, height: 88, borderRadius: radii.md },
+  thumbRemove: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 11,
+  },
   cta: {
     marginTop: spacing.lg,
     borderRadius: radii.lg,
