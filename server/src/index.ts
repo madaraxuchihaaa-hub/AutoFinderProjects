@@ -1,5 +1,4 @@
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 import { ensureJwtSecretConfigured } from "./auth/jwt.js";
 import { registerAuthRoutes } from "./auth/routes.js";
@@ -22,8 +21,6 @@ import { registerUploadRoutes } from "./uploadRoutes.js";
 import { registerVehicleRoutes } from "./vehicleRoutes.js";
 import { hasWebBuild, registerWeb } from "./serveWeb.js";
 import { ensureUploadsDir } from "./uploadPaths.js";
-
-dotenv.config();
 
 const app = express();
 app.set("trust proxy", 1);
@@ -222,7 +219,7 @@ async function main() {
   ensureJwtSecretConfigured();
   await runMigrations(pool);
   await seedCarCatalogIfNeeded(pool);
-  if (process.env.SEED_TEST_DATA === "1") {
+  if (String(process.env.SEED_TEST_DATA ?? "0").trim() === "1") {
     await seedTestListingsFromManifest(pool);
   }
   app.listen(port, () => {
