@@ -92,16 +92,19 @@ export function equipmentDisplayHtml(sections, esc, opts = {}) {
 }
 
 export function initEquipmentToggle(root) {
-  const block = root.querySelector("#listing-equipment");
-  if (!block) return;
-  const btn = block.querySelector("[data-eq-toggle]");
-  const body = block.querySelector("[data-eq-body]");
-  if (!btn || !body) return;
-  btn.addEventListener("click", () => {
-    const hidden = body.hidden;
-    body.hidden = !hidden;
-    btn.setAttribute("aria-expanded", hidden ? "true" : "false");
-    btn.textContent = hidden ? "Скрыть опции" : "Показать опции";
+  if (!root) return;
+  root.querySelectorAll("[data-eq-toggle]").forEach((btn) => {
+    const block = btn.closest(".ls-av__equipment");
+    const body = block?.querySelector("[data-eq-body]");
+    if (!body) return;
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const hidden = body.hidden;
+      body.hidden = !hidden;
+      btn.setAttribute("aria-expanded", hidden ? "true" : "false");
+      btn.textContent = hidden ? "Скрыть опции" : "Показать опции";
+    });
   });
 }
 

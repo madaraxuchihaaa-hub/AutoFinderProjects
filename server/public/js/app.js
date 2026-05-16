@@ -301,7 +301,6 @@ function catalogCard(item, opts = {}) {
                   `<div><dt>${esc(dt)}</dt><dd>${esc(dd)}</dd></div>`
               )
               .join("")}</dl>
-            ${title ? `<p class="catalog-card__excerpt">${esc(title.slice(0, 90))}</p>` : ""}
           </div>
         </a>
         ${
@@ -435,7 +434,6 @@ async function pageListings(query) {
       <div class="hero-catalog__main">
         <p class="hero-kicker">AutoFinder</p>
         <h1>Каталог автомобилей и мототехники</h1>
-        <p class="muted">Подбор по цене, году, кузову, топливу, коробке и объёму двигателя. Сохраняйте варианты в избранное.</p>
       </div>
       <div class="hero-catalog__stats">
         <div class="hero-stat"><span class="hero-stat__label">Найдено</span><strong class="hero-stat__value">${total}</strong></div>
@@ -466,13 +464,13 @@ async function pageListings(query) {
         <label><span>Цена до</span><input type="number" name="price_max" min="0" step="1000" value="${esc(query.price_max || "")}" /></label>
         <label><span>Год от</span><input type="number" name="year_min" min="1950" max="2100" value="${esc(query.year_min || "")}" /></label>
         <label><span>Год до</span><input type="number" name="year_max" min="1950" max="2100" value="${esc(query.year_max || "")}" /></label>
-        <label><span>Топливо</span><select name="fuel" aria-describedby="filter-fuel-hint">${fuelOpts}</select><span class="filter-field-hint" id="filter-fuel-hint">Как в карточке объявления</span></label>
-        <label><span>Кузов</span><select name="body" aria-describedby="filter-body-hint">${bodyOpts}</select><span class="filter-field-hint" id="filter-body-hint">Тип кузова</span></label>
-        <label><span>Коробка</span><select name="transmission" aria-describedby="filter-trans-hint">${transOpts}</select><span class="filter-field-hint" id="filter-trans-hint">Тип КПП</span></label>
+        <label><span>Топливо</span><select name="fuel">${fuelOpts}</select></label>
+        <label><span>Кузов</span><select name="body">${bodyOpts}</select></label>
+        <label><span>Коробка</span><select name="transmission">${transOpts}</select></label>
         <label><span>Привод</span><select name="drivetrain"><option value="">—</option>${driveOpts}</select></label>
         <label><span>Поколение</span><input type="text" name="generation" value="${esc(query.generation || "")}" placeholder="рестайлинг" /></label>
-        <label><span>Объём от, л</span><input type="number" name="volume_from" min="0" step="0.1" list="catalog-volume-presets" value="${esc(query.volume_from || "")}" aria-describedby="filter-volume-hint" /></label>
-        <label><span>Объём до, л</span><input type="number" name="volume_to" min="0" step="0.1" list="catalog-volume-presets" value="${esc(query.volume_to || "")}" aria-describedby="filter-volume-hint" /></label>
+        <label><span>Объём от, л</span><input type="number" name="volume_from" min="0" step="0.1" list="catalog-volume-presets" value="${esc(query.volume_from || "")}" /></label>
+        <label><span>Объём до, л</span><input type="number" name="volume_to" min="0" step="0.1" list="catalog-volume-presets" value="${esc(query.volume_to || "")}" /></label>
         <label><span>Валюта цены</span><select name="currency"><option value="byn" ${query.currency !== "usd" ? "selected" : ""}>BYN</option><option value="usd" ${query.currency === "usd" ? "selected" : ""}>USD</option></select></label>
         <label><span>Город</span><input type="text" name="city" value="${esc(query.city || "")}" placeholder="Минск" /></label>
         <label class="filter-toggle"><span>Медиа</span>
@@ -481,17 +479,12 @@ async function pageListings(query) {
           </span>
         </label>
       </div>
-      <p class="filters-hint muted small" id="filter-volume-hint">
-        Объём учитывается только для объявлений, где продавец указал литраж. Подсказки при вводе — из списка частых значений.
-        Топливо и коробка — те же значения, что при подаче объявления (бензин, дизель, механика, автомат и т.д.).
-      </p>
       <div class="filters-actions">
         <button type="submit">Найти</button>
         <a class="button ghost" href="#/listings">Сбросить</a>
       </div>
     </form>
 
-    <p class="results-meta">Найдено: <strong>${total}</strong>${query.has_photo ? " · только объявления с фотографиями" : ""}</p>
     <div class="catalog-grid">${items.length ? items.map((i) => catalogCard(i)).join("") : ""}</div>
     ${total === 0 ? '<p class="empty">Объявлений пока нет. Зарегистрируйтесь и разместите первое.</p>' : ""}
     ${totalPages > 1 ? renderPagination(page, totalPages, query) : ""}
@@ -676,7 +669,7 @@ async function pageListing(id) {
 
   app.innerHTML = `
     ${item.status === "moderation" ? '<p class="banner banner-warn">Объявление на модерации — в каталоге появится после проверки.</p>' : ""}
-    <p class="banner banner-warn" id="listing-images-hint" hidden>Фото не найдены на сервере. Загрузите их снова в приложении. На Railway подключите постоянный том для папки <strong>uploads</strong>.</p>
+    <p class="banner banner-warn" id="listing-images-hint" hidden>Файлы фото не найдены — загрузите снова в приложении.</p>
     ${item.reject_reason ? `<p class="banner banner-warn">${esc(item.reject_reason)}</p>` : ""}
     <div class="ls-av" id="listing-av-card">
       <header class="ls-av__top">
@@ -742,14 +735,7 @@ async function pageListing(id) {
               <div><span class="muted small">Ежемесячный платёж</span><strong data-loan-payment>0 BYN</strong></div>
               <div><span class="muted small">Переплата</span><strong data-loan-overpay>0 BYN</strong></div>
             </div>
-            <p class="muted small">Оценка ориентировочная: итоговые условия зависят от банка.</p>
-          </div>
-        </section>
-        <section class="ls-av__panel ls-av__panel--wide">
-          <h2 class="ls-av__panel-title">Почему стоит сравнить</h2>
-          <div class="compare-hint">
-            <p>Добавляйте до ${CMP_MAX} объявлений в сравнение, чтобы быстро сопоставить цену, пробег, кузов, коробку, топливо и город.</p>
-            <a class="button ghost" href="#/compare">Открыть сравнение</a>
+            <p class="muted small">Ориентировочно; итог — в банке.</p>
           </div>
         </section>
       </div>
@@ -789,7 +775,6 @@ async function pageCreateListing(editId) {
       <div class="hero-catalog__main">
         <p class="hero-kicker">Продажа</p>
         <h1>${isEdit ? "Редактировать объявление" : "Подать объявление"}</h1>
-        <p class="muted">Заполните данные и выберите комплектацию из списка.</p>
       </div>
     </section>
     <form class="card stack create-listing" id="create-listing-form">
@@ -818,7 +803,6 @@ async function pageCreateListing(editId) {
       <label>Описание<textarea name="description" rows="4" maxlength="4000" placeholder="История, состояние…"></textarea></label>
       <label class="checkbox-row"><input type="checkbox" name="show_phone" checked /> Показывать телефон в объявлении</label>
       <label>Фото (URL, по одному в строке)<textarea name="image_urls" rows="3" placeholder="https://… или загрузите в приложении"></textarea></label>
-      <p class="muted small">Для загрузки с телефона используйте мобильное приложение — ссылки добавятся автоматически.</p>
       <button type="submit" class="button">${isEdit ? "Сохранить" : "Отправить на модерацию"}</button>
     </form>
   `;
@@ -988,11 +972,6 @@ function pageHelp() {
       <div class="hero-catalog__main">
         <p class="hero-kicker">Справка</p>
         <h1>Как пользоваться AutoFinder</h1>
-        <p class="muted">Ниже собраны самые частые вопросы: как найти машину, как разместить объявление и что делать, если что-то пошло не так.</p>
-      </div>
-      <div class="hero-catalog__stats">
-        <div class="hero-stat"><span class="hero-stat__label">Для покупки</span><strong class="hero-stat__value">Каталог</strong></div>
-        <div class="hero-stat"><span class="hero-stat__label">Для продажи</span><strong class="hero-stat__value">Профиль</strong></div>
       </div>
     </section>
     <section class="card help-section"><h2>1. Как найти подходящий автомобиль</h2><ol><li>Откройте <a href="#/listings">каталог</a>.</li><li>Задайте марку, модель, цену, год, тип кузова и другие фильтры.</li><li>Включите фильтр «Только с фото».</li><li>Откройте карточку объявления для описания, фотографий и контактов.</li></ol></section>
@@ -1036,12 +1015,11 @@ async function pageHome() {
     <section class="home-hero card">
       <p class="hero-kicker">AutoFinder</p>
       <h1>Подбор и продажа</h1>
-      <p class="muted">Один аккаунт на сайте и в приложении: избранное, сравнение и сообщения синхронизируются после входа.</p>
       ${err ? `<p class="banner banner-err">${esc(err)}</p>` : ""}
       <div class="home-stats">
         <div class="home-stat"><strong>${stats?.publishedListings ?? "—"}</strong><span class="muted small">Опубликовано</span></div>
         <div class="home-stat"><strong>${stats?.queuePending ?? "—"}</strong><span class="muted small">В очереди публикаций</span></div>
-        <div class="home-stat"><strong>${stats?.aggregated ?? "—"}</strong><span class="muted small">В ленте (агрегат)</span></div>
+        <div class="home-stat"><strong>${stats?.aggregated ?? "—"}</strong><span class="muted small">В ленте</span></div>
       </div>
       <div class="home-actions">
         <a class="button" href="#/listings">Каталог</a>
@@ -1053,7 +1031,6 @@ async function pageHome() {
     </section>
     <section class="card">
       <h2>Свежие в ленте</h2>
-      <p class="muted small">Карточки с внешних площадок. Объявления пользователей — в каталоге.</p>
       <div class="home-featured">${cards}</div>
     </section>
   `;
@@ -1097,7 +1074,6 @@ async function pageFeed(id) {
             </div>
             <p class="ls-av__params">${item.year ? `${item.year} г.` : "—"} · ${esc(item.city || "—")}</p>
           </div>
-          <p class="muted small">Чтобы написать продавцу, откройте объявление пользователя в <a href="#/listings">каталоге</a>.</p>
         </aside>
       </div>
       <div class="ls-av__panels ls-av__panels--specs">
@@ -1123,7 +1099,7 @@ function pageSettings() {
   document.title = "Тема оформления — AutoFinder";
   const cur = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
   app.innerHTML = `
-    <section class="hero"><h1>Тема сайта</h1><p class="muted">Сохраняется в этом браузере. В приложении тема настраивается отдельно.</p></section>
+    <section class="hero"><h1>Тема сайта</h1></section>
     <section class="card narrow-profile">
       <h2>Оформление</h2>
       <div class="settings-theme-row">
@@ -1212,7 +1188,6 @@ async function pageAdmin(query) {
     <div class="admin-shell">
       <section class="hero admin-hero">
         <h1>Админ-панель</h1>
-        <p class="muted">Модерация заявок, учётные записи и все объявления в одном месте.</p>
       </section>
       ${renderAdminTabs(tab)}
       <div class="admin-panel card" id="admin-panel-root"><p class="loading">Загрузка…</p></div>
@@ -1229,9 +1204,7 @@ async function pageAdmin(query) {
       root.innerHTML = `<p class="error">${esc(e.message)}</p>`;
       return;
     }
-    root.innerHTML = `
-      <p class="muted small" style="margin-top:0">Заявки в статусе «на проверке». Одобрение и отклонение — на странице проверки.</p>
-      <div class="staff-queue" style="margin-top:0.75rem">${staffPendingCardsInnerHtml(rows)}</div>`;
+    root.innerHTML = `<div class="staff-queue" style="margin-top:0">${staffPendingCardsInnerHtml(rows)}</div>`;
     return;
   }
 
@@ -1420,7 +1393,7 @@ async function pageStaff() {
   }
   const list = staffPendingCardsInnerHtml(rows);
   app.innerHTML = `
-    <section class="hero"><h1>Модерация</h1><p class="muted">Заявки в статусе «на проверке». Одобрение и отклонение — как в приложении.</p></section>
+    <section class="hero"><h1>Модерация</h1></section>
     <div class="staff-queue">${list}</div>
   `;
 }
@@ -1454,7 +1427,7 @@ async function pageStaffReview(id) {
   const mainSrc = imgs[0] || null;
   app.innerHTML = `
     <p class="muted small"><a href="#/staff">← Все заявки</a></p>
-    <div class="banner banner-warn">Проверка заявки: одобрить или отклонить с причиной (синхронизируется с приложением).</div>
+    <div class="banner banner-warn">Одобрить или отклонить с причиной.</div>
     <div class="ls-av">
       <header class="ls-av__top">
         <h1 class="ls-av__title">${esc(item.title)}</h1>
@@ -1492,6 +1465,7 @@ async function pageStaffReview(id) {
       </div>
     </div>
   `;
+  initEquipmentToggle(app);
   $("#staff-approve")?.addEventListener("click", async () => {
     if (!confirm("Одобрить и опубликовать объявление?")) return;
     try {
@@ -1526,7 +1500,7 @@ async function pageCompare() {
   const valid = await saved.loadCompareList();
   if (!valid.length) {
     app.innerHTML = `
-      <section class="hero hero-catalog card"><div class="hero-catalog__main"><p class="hero-kicker">Сравнение</p><h1>Сравнение автомобилей</h1><p class="muted">Сопоставляйте до ${CMP_MAX} объявлений.</p></div></section>
+      <section class="hero hero-catalog card"><div class="hero-catalog__main"><p class="hero-kicker">Сравнение</p><h1>Сравнение автомобилей</h1></div></section>
       <p class="empty">Пока нечего сравнивать. Добавьте объявления из каталога.</p>`;
     return;
   }
@@ -1652,18 +1626,18 @@ async function pageProfile() {
     /* keep cached */
   }
   $("#app").innerHTML = `
-    <section class="hero"><h1>Профиль</h1><p class="muted">${esc(me.email)}</p><p class="muted small">Избранное, сравнение и чаты после входа совпадают с мобильным приложением.</p></section>
+    <section class="hero"><h1>Профиль</h1><p class="muted">${esc(me.email)}</p></section>
     <div class="profile-shortcuts">
-      <a class="card profile-shortcut" href="#/my-listings"><strong>Мои объявления</strong><span class="muted small">Статусы и редактирование</span></a>
-      <a class="card profile-shortcut" href="#/favorites"><strong>Избранное</strong><span class="muted small">Сохранённые объявления</span></a>
-      <a class="card profile-shortcut" href="#/compare"><strong>Сравнение</strong><span class="muted small">До ${CMP_MAX} авто</span></a>
-      <a class="card profile-shortcut" href="#/messages"><strong>Сообщения</strong><span class="muted small">Переписка с покупателями</span></a>
-      <a class="card profile-shortcut" href="#/settings"><strong>Тема сайта</strong><span class="muted small">Только в браузере</span></a>
+      <a class="card profile-shortcut" href="#/my-listings"><strong>Мои объявления</strong></a>
+      <a class="card profile-shortcut" href="#/favorites"><strong>Избранное</strong></a>
+      <a class="card profile-shortcut" href="#/compare"><strong>Сравнение</strong></a>
+      <a class="card profile-shortcut" href="#/messages"><strong>Сообщения</strong></a>
+      <a class="card profile-shortcut" href="#/settings"><strong>Тема сайта</strong></a>
       ${
         me.role === "admin"
-          ? `<a class="card profile-shortcut" href="#/admin"><strong>Админ-панель</strong><span class="muted small">Модерация, пользователи, объявления</span></a>`
+          ? `<a class="card profile-shortcut" href="#/admin"><strong>Админ-панель</strong></a>`
           : me.role === "moderator"
-            ? `<a class="card profile-shortcut" href="#/staff"><strong>Модерация</strong><span class="muted small">Заявки на публикацию</span></a>`
+            ? `<a class="card profile-shortcut" href="#/staff"><strong>Модерация</strong></a>`
             : ""
       }
     </div>
@@ -1707,7 +1681,7 @@ async function pageFavorites() {
   document.title = "Избранное — AutoFinder";
   app.innerHTML = `<p class="loading">Загрузка…</p>`;
   const items = await saved.loadFavoritesList();
-  app.innerHTML = `<section class="hero"><h1>Избранное</h1><p class="muted small">${getUser() ? "Синхронизируется с приложением" : "Войдите, чтобы сохранить на всех устройствах"}</p></section>${items.length ? `<div class="catalog-grid">${items.map((i) => catalogCard(i)).join("")}</div>` : '<p class="empty">Список пуст.</p>'}`;
+  app.innerHTML = `<section class="hero"><h1>Избранное</h1></section>${items.length ? `<div class="catalog-grid">${items.map((i) => catalogCard(i)).join("")}</div>` : '<p class="empty">Список пуст.</p>'}`;
   bindCardActions(app);
 }
 
