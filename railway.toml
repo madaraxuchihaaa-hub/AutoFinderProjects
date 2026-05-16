@@ -4,8 +4,10 @@
 #   JWT_SECRET      — случайная строка 32+ символов
 #   DATABASE_URL    — PostgreSQL (или PGHOST/PGUSER/…)
 #   DISABLE_STATIC_CACHE=1 — отключить кэш CSS/JS (если после деплоя не видно обновлений)
-#   NPM_CONFIG_PRODUCTION=false — убрать предупреждение npm о legacy `production` (или оставьте nixpacks.toml)
-#   Фото: по умолчанию папка server/uploads (рядом с кодом). Том Railway смонтируйте на этот путь,
+#   SEED_TEST_DATA  — 1: при старте выполнить сид из server/test-data/manifest.json; 0 или не задавать — выкл.
+#                      Фото в репозитории (server/test-data/photos) попадают в образ. Нет файла — объявление без фото (лог).
+#   TEST_DATA_PHOTOS_DIR — опционально: другой путь к jpg (том Railway); иначе — server/test-data/photos.
+#   Фото объявлений (uploads): по умолчанию server/uploads. Том Railway смонтируйте на этот путь,
 #   например mount path = server/uploads (или задайте UPLOAD_DIR и смонтируйте туда же).
 #
 # Быстрее: Settings → Root Directory = server (тогда startCommand = npm start).

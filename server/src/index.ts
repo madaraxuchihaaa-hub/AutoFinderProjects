@@ -220,7 +220,11 @@ async function main() {
   await runMigrations(pool);
   await seedCarCatalogIfNeeded(pool);
   if (String(process.env.SEED_TEST_DATA ?? "0").trim() === "1") {
-    await seedTestListingsFromManifest(pool);
+    try {
+      await seedTestListingsFromManifest(pool);
+    } catch (e) {
+      console.error("[seed-test] ошибка сида, сервис продолжит старт:", e);
+    }
   }
   app.listen(port, () => {
     const web = hasWebBuild() ? " · web" : "";

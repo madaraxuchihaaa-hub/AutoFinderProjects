@@ -83,10 +83,17 @@ async function ensureSeller(
   return ins.rows[0].id;
 }
 
-function copyPhotoToUploads(photosDir: string, photoFile: string, uploadsDir: string): string {
+function copyPhotoToUploads(
+  photosDir: string,
+  photoFile: string,
+  uploadsDir: string
+): string | null {
   const src = path.join(photosDir, photoFile);
   if (!fs.existsSync(src)) {
-    throw new Error(`Фото не найдено: ${src}`);
+    console.warn(
+      `[seed-test] фото не найдено, объявление без картинки: ${src} (локально добавьте файл в test-data/photos или задайте TEST_DATA_PHOTOS_DIR на том с фото)`
+    );
+    return null;
   }
   const ext = path.extname(photoFile) || ".jpg";
   const destName = `seed-${randomUUID()}${ext}`;
@@ -112,7 +119,7 @@ export async function seedTestListingsFromManifest(pool: Pool): Promise<void> {
   }
 
   const uploadsDir = ensureUploadsDir();
-  const photosDir = loader.photosDir;
+  const photosDir = process.env.TEST_DATA_PHOTOS_DIR?.trim() || loader.photosDir;
 
   const hash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
@@ -130,6 +137,9 @@ export async function seedTestListingsFromManifest(pool: Pool): Promise<void> {
       `DELETE FROM listings WHERE user_id IN (SELECT id FROM users WHERE email = ANY($1::text[]))`,
       [emails]
     );
+
+    let withPhoto = 0;
+    let withoutPhoto = 0;
 
     for (const item of manifest.listings) {
       const sellerIdx = item.sellerIndex === 1 ? 1 : 0;
@@ -188,15 +198,20 @@ export async function seedTestListingsFromManifest(pool: Pool): Promise<void> {
 
       const listingId = ins.rows[0].id;
       const imageUrl = copyPhotoToUploads(photosDir, item.photoFile, uploadsDir);
-      await client.query(
-        `INSERT INTO listing_images (listing_id, url, sort_order) VALUES ($1,$2,0)`,
-        [listingId, imageUrl]
-      );
+      if (imageUrl) {
+        await client.query(
+          `INSERT INTO listing_images (listing_id, url, sort_order) VALUES ($1,$2,0)`,
+          [listingId, imageUrl]
+        );
+        withPhoto++;
+      } else {
+        withoutPhoto++;
+      }
     }
 
     await client.query("COMMIT");
     console.info(
-      `[seed-test] готово: ${manifest.listings.length} объявлений, продавцы ${emails.join(", ")} (пароль: ${DEMO_PASSWORD})`
+      `[seed-test] готово: ${manifest.listings.length} объявлений (${withPhoto} с фото, ${withoutPhoto} без), продавцы ${emails.join(", ")} (пароль: ${DEMO_PASSWORD})`
     );
   } catch (e) {
     await client.query("ROLLBACK");
